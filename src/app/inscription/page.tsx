@@ -74,17 +74,18 @@ export default function InscriptionPage() {
   });
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("site_settings")
-      .select("*")
-      .eq("id", 1)
-      .single()
-      .then(({ data }) => {
-        if (data) setSettings({ ...defaultSettings, ...data });
+    const load = async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.from("site_settings").select("*").eq("id", 1).single();
+        if (data) setSettings({ ...defaultSettings, ...(data as Partial<Settings>) });
+      } catch {
+        // keep defaults
+      } finally {
         setSettingsLoaded(true);
-      })
-      .catch(() => setSettingsLoaded(true));
+      }
+    };
+    load();
   }, []);
 
   const prices = pricesFrom(settings);

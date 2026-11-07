@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/supabase/require-admin";
+import { writeAudit } from "@/lib/audit";
 
 /** Anti CSV injection : préfixer si commence par = + - @ */
 function csvSafe(val: unknown): string {
@@ -65,6 +66,8 @@ export async function GET(request: Request) {
     .from("inscriptions")
     .update({ exporte: true, date_export: new Date().toISOString() })
     .in("id", ids);
+
+  await writeAudit(supabase, gate.user?.email, "export_tmh", "inscriptions", `${data.length} lignes`);
 
   return new NextResponse(csv, {
     headers: {

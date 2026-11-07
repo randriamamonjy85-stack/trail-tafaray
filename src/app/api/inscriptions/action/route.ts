@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/supabase/require-admin";
+import { writeAudit } from "@/lib/audit";
 
 export async function POST(request: Request) {
   const gate = await requireAdminSession();
@@ -19,5 +20,6 @@ export async function POST(request: Request) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await writeAudit(gate.admin!, gate.user?.email, action, "inscription", String(id));
   return NextResponse.json({ success: true });
 }

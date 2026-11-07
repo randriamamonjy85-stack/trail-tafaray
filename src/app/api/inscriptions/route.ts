@@ -7,6 +7,7 @@ import {
   parseDateNaissance,
   type CategoryRule,
 } from "@/lib/categories-engine";
+import { rateLimit } from "@/lib/rate-limit";
 
 const COURSE_TARIF_KEYS: Record<string, string> = {
   "Zaza Tafaray": "tarif_zaza",
@@ -77,6 +78,18 @@ export async function GET() {
 /** POST : public (inscription) — montants et catégorie recalculés côté serveur */
 export async function POST(request: Request) {
   try {
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const rl = rateLimit(`inscription:${ip}`, 6, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { success: false, error: "Trop de tentatives. Réessayez dans une minute." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const supabase = createAdminClient();
 

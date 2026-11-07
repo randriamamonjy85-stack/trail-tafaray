@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
 import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
 import CoursesAdmin from "@/components/admin/CoursesAdmin";
+import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
+import AuditAdmin from "@/components/admin/AuditAdmin";
+import FooterAdmin from "@/components/admin/FooterAdmin";
 
 type Tab =
   | "inscriptions"
@@ -16,7 +19,10 @@ type Tab =
   | "photos"
   | "resultats"
   | "categories"
-  | "courses";
+  | "courses"
+  | "documents"
+  | "audit"
+  | "footer";
 
 type Inscription = {
   id: string;
@@ -389,6 +395,9 @@ export default function AdminPage() {
     { id: "actualites", label: "Actualités" },
     { id: "photos", label: "Photos" },
     { id: "resultats", label: "Résultats" },
+    { id: "documents", label: "Documents" },
+    { id: "footer", label: "Pied de page" },
+    { id: "audit", label: "Journal audit" },
   ];
 
   return (
@@ -1081,6 +1090,11 @@ export default function AdminPage() {
 
       
       {tab === "categories" && <CategoriesAdmin />}
+      {tab === "documents" && <DocumentsAdmin />}
+      {tab === "audit" && <AuditAdmin />}
+      {tab === "footer" && (
+        <FooterAdmin settings={settings} setSettings={setSettings} saveSettings={saveSettings} />
+      )}
       {tab === "courses" && <CoursesAdmin />}
 
 {/* ========== RÉSULTATS ========== */}

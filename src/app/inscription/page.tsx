@@ -315,19 +315,19 @@ function InscriptionForm() {
         {/* 1. Personnelles */}
         <Section title="1. Informations personnelles">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Prénom" required>
-              <input
-                className={inputCls}
-                value={form.prenom}
-                onChange={(e) => set("prenom", e.target.value)}
-                required
-              />
-            </Field>
             <Field label="Nom" required>
               <input
                 className={inputCls}
                 value={form.nom}
                 onChange={(e) => set("nom", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Prénom" required>
+              <input
+                className={inputCls}
+                value={form.prenom}
+                onChange={(e) => set("prenom", e.target.value)}
                 required
               />
             </Field>

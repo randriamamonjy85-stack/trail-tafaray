@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
+import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
+import CoursesAdmin from "@/components/admin/CoursesAdmin";
 
 type Tab =
   | "inscriptions"
@@ -12,7 +14,9 @@ type Tab =
   | "partenaires"
   | "actualites"
   | "photos"
-  | "resultats";
+  | "resultats"
+  | "categories"
+  | "courses";
 
 type Inscription = {
   id: string;
@@ -376,6 +380,8 @@ export default function AdminPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "inscriptions", label: "Inscriptions" },
+    { id: "courses", label: "Courses" },
+    { id: "categories", label: "Catégories âge" },
     { id: "contenu", label: "Contenu" },
     { id: "visibilite", label: "Visibilité" },
     { id: "mobile", label: "Mobile Money" },
@@ -702,6 +708,81 @@ export default function AdminPage() {
               }
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Bénéficiaire</label>
+            <input
+              className="w-full border border-stone-300 rounded-lg px-4 py-2"
+              value={(settings as any).mm_beneficiaire || ""}
+              onChange={(e) =>
+                setSettings({ ...settings, mm_beneficiaire: e.target.value } as any)
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Titulaire du compte</label>
+            <input
+              className="w-full border border-stone-300 rounded-lg px-4 py-2"
+              value={(settings as any).mm_titulaire || ""}
+              onChange={(e) =>
+                setSettings({ ...settings, mm_titulaire: e.target.value } as any)
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Instructions de paiement</label>
+            <textarea
+              className="w-full border border-stone-300 rounded-lg px-4 py-2"
+              rows={2}
+              value={(settings as any).mm_instructions || ""}
+              onChange={(e) =>
+                setSettings({ ...settings, mm_instructions: e.target.value } as any)
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Tarif navette (Ar / personne)</label>
+            <input
+              type="number"
+              className="w-full border border-stone-300 rounded-lg px-4 py-2"
+              value={(settings as any).tarif_navette ?? 20000}
+              onChange={(e) =>
+                setSettings({ ...settings, tarif_navette: Number(e.target.value) } as any)
+              }
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Mode frais retrait</label>
+            <select
+              className="w-full border border-stone-300 rounded-lg px-4 py-2"
+              value={(settings as any).mm_frais_mode || "fixe"}
+              onChange={(e) =>
+                setSettings({ ...settings, mm_frais_mode: e.target.value } as any)
+              }
+            >
+              <option value="fixe">Fixe (Ar)</option>
+              <option value="pourcent">Pourcentage (%)</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs mb-1">Frais MVola</label>
+              <input type="number" className="w-full border rounded-lg px-2 py-2"
+                value={(settings as any).mm_frais_mvola ?? 0}
+                onChange={(e) => setSettings({ ...settings, mm_frais_mvola: Number(e.target.value) } as any)} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1">Frais Orange</label>
+              <input type="number" className="w-full border rounded-lg px-2 py-2"
+                value={(settings as any).mm_frais_orange ?? 0}
+                onChange={(e) => setSettings({ ...settings, mm_frais_orange: Number(e.target.value) } as any)} />
+            </div>
+            <div>
+              <label className="block text-xs mb-1">Frais Airtel</label>
+              <input type="number" className="w-full border rounded-lg px-2 py-2"
+                value={(settings as any).mm_frais_airtel ?? 0}
+                onChange={(e) => setSettings({ ...settings, mm_frais_airtel: Number(e.target.value) } as any)} />
+            </div>
+          </div>
           <button
             onClick={saveSettings}
             className="bg-[#1F2C3F] text-white px-6 py-3 rounded-full font-medium"
@@ -727,10 +808,14 @@ export default function AdminPage() {
               value={partenaireForm.type}
               onChange={(e) => setPartenaireForm({ ...partenaireForm, type: e.target.value })}
             >
-              <option value="officiel">Officiel</option>
-              <option value="technique">Technique</option>
-              <option value="institutionnel">Institutionnel</option>
-              <option value="media">Média</option>
+              <option value="sponsor_officiel">Sponsor officiel</option>
+              <option value="sponsor_principal">Sponsor principal</option>
+              <option value="partenaire_officiel">Partenaire officiel</option>
+              <option value="institutionnel">Partenaire institutionnel</option>
+              <option value="technique">Partenaire technique</option>
+              <option value="media">Partenaire média</option>
+              <option value="logistique">Partenaire logistique</option>
+              <option value="autre">Autre partenaire</option>
             </select>
             <textarea
               className="w-full border border-stone-300 rounded-lg px-4 py-2"
@@ -946,7 +1031,11 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ========== RÉSULTATS ========== */}
+      
+      {tab === "categories" && <CategoriesAdmin />}
+      {tab === "courses" && <CoursesAdmin />}
+
+{/* ========== RÉSULTATS ========== */}
       {tab === "resultats" && (
         <div className="bg-white rounded-2xl border border-stone-200 p-6 max-w-3xl space-y-4">
           <h2 className="text-xl font-bold text-[#1F2C3F]">Importer les résultats</h2>

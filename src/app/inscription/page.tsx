@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { COURSE_CATEGORIES } from "@/lib/categories";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
+import {
+  formatDateInput,
+  parseDateNaissance,
+  computeCategory,
+  type CategoryRule,
+} from "@/lib/categories-engine";
 
 type Settings = {
   inscriptions_ouvertes: boolean;
@@ -13,9 +19,18 @@ type Settings = {
   tarif_intense: number;
   tarif_vtt: number;
   tarif_duathlon: number;
+  tarif_navette: number;
   mobile_money_mvola: string;
   mobile_money_orange: string;
   mobile_money_airtel: string;
+  mm_beneficiaire: string;
+  mm_titulaire: string;
+  mm_instructions: string;
+  mm_frais_mode: string;
+  mm_frais_mvola: number;
+  mm_frais_orange: number;
+  mm_frais_airtel: number;
+  tee_sizes: string;
 };
 
 const defaultSettings: Settings = {
@@ -26,9 +41,18 @@ const defaultSettings: Settings = {
   tarif_intense: 45000,
   tarif_vtt: 40000,
   tarif_duathlon: 50000,
+  tarif_navette: 20000,
   mobile_money_mvola: "",
   mobile_money_orange: "",
   mobile_money_airtel: "",
+  mm_beneficiaire: "Association Trail Tafaray",
+  mm_titulaire: "",
+  mm_instructions: "Effectuez le transfert puis indiquez la référence de transaction.",
+  mm_frais_mode: "fixe",
+  mm_frais_mvola: 0,
+  mm_frais_orange: 0,
+  mm_frais_airtel: 0,
+  tee_sizes: "S,M,L,XL,XXL",
 };
 
 function pricesFrom(s: Settings): Record<string, number> {
@@ -42,20 +66,57 @@ function pricesFrom(s: Settings): Record<string, number> {
   };
 }
 
-export default function InscriptionPage() {
-  const [step, setStep] = useState(1);
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
+      <h2 className="text-lg font-semibold text-[#1F2C3F] border-b border-stone-100 pb-2">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-stone-700 mb-1">
+        {label}
+        {required ? " *" : ""}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls = "w-full border border-stone-300 rounded-lg px-4 py-3 text-base";
+
+function InscriptionForm() {
+  const searchParams = useSearchParams();
+  const courseParam = searchParams.get("course") || "";
+
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [rules, setRules] = useState<CategoryRule[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [categorieResult, setCategorieResult] = useState("");
+  const [dateError, setDateError] = useState("");
 
   const [form, setForm] = useState({
     prenom: "",
     nom: "",
     dateNaissance: "",
     genre: "",
-    categorie: "",
     nationalite: "",
     email: "",
     telephone: "",
@@ -63,8 +124,8 @@ export default function InscriptionPage() {
     organisation: "",
     tailleTee: "",
     navette: "Non",
-    placesNavette: 0,
-    course: "",
+    placesNavette: 1,
+    course: courseParam && COURSES.includes(courseParam as any) ? courseParam : "",
     contactUrgence: "",
     telephoneUrgence: "",
     numeroIdentite: "",
@@ -74,36 +135,110 @@ export default function InscriptionPage() {
   });
 
   useEffect(() => {
-    const load = async () => {
+    const supabase = createClient();
+    (async () => {
       try {
-        const supabase = createClient();
-        const { data } = await supabase.from("site_settings").select("*").eq("id", 1).single();
-        if (data) setSettings({ ...defaultSettings, ...(data as Partial<Settings>) });
-      } catch {
-        // keep defaults
+        const [sRes, rRes] = await Promise.all([
+          supabase.from("site_settings").select("*").eq("id", 1).single(),
+          supabase.from("category_rules").select("*").eq("actif", true).order("ordre"),
+        ]);
+        if (sRes.data) setSettings({ ...defaultSettings, ...sRes.data });
+        if (rRes.data) setRules(rRes.data as CategoryRule[]);
       } finally {
-        setSettingsLoaded(true);
+        setLoaded(true);
       }
-    };
-    load();
+    })();
   }, []);
 
   const prices = pricesFrom(settings);
+  const teeSizes = (settings.tee_sizes || "S,M,L,XL,XXL")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s && s.toUpperCase() !== "XS");
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
-      ...(name === "course" ? { categorie: "" } : {}),
-    }));
+  const showTee = form.course !== "" && form.course !== "Zaza Tafaray";
+
+  // Catégorie auto
+  useEffect(() => {
+    if (form.dateNaissance && form.genre && form.course && rules.length) {
+      const cat = computeCategory(form.dateNaissance, form.genre, form.course, rules);
+      setCategorieResult(cat);
+    } else {
+      setCategorieResult("");
+    }
+  }, [form.dateNaissance, form.genre, form.course, rules]);
+
+  const totals = useMemo(() => {
+    const prixCourse = form.course ? prices[form.course] || 0 : 0;
+    const places = form.navette === "Oui" ? Math.max(1, Number(form.placesNavette) || 1) : 0;
+    const navette = form.navette === "Oui" ? (settings.tarif_navette || 20000) * places : 0;
+    let frais = 0;
+    const base = prixCourse + navette;
+    const op = form.operateur.toLowerCase();
+    let cfg = 0;
+    if (op.includes("mvola")) cfg = Number(settings.mm_frais_mvola) || 0;
+    else if (op.includes("orange")) cfg = Number(settings.mm_frais_orange) || 0;
+    else if (op.includes("airtel")) cfg = Number(settings.mm_frais_airtel) || 0;
+    if (settings.mm_frais_mode === "pourcent") frais = Math.round((base * cfg) / 100);
+    else frais = cfg;
+    return { prixCourse, navette, frais, total: base + frais, places };
+  }, [form.course, form.navette, form.placesNavette, form.operateur, prices, settings]);
+
+  const mmNumber = useMemo(() => {
+    const op = form.operateur.toLowerCase();
+    if (op.includes("mvola")) return settings.mobile_money_mvola;
+    if (op.includes("orange")) return settings.mobile_money_orange;
+    if (op.includes("airtel")) return settings.mobile_money_airtel;
+    return "";
+  }, [form.operateur, settings]);
+
+  const set = (name: string, value: string | number | boolean) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async () => {
+  const onDateKeyboard = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatDateInput(e.target.value);
+    set("dateNaissance", formatted);
+    if (formatted.length === 10) {
+      const ok = parseDateNaissance(formatted);
+      setDateError(ok ? "" : "Date invalide ou future");
+    } else {
+      setDateError("");
+    }
+  };
+
+  const onDatePicker = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const iso = e.target.value; // YYYY-MM-DD
+    if (!iso) return;
+    const [y, m, d] = iso.split("-");
+    const formatted = `${d}/${m}/${y}`;
+    set("dateNaissance", formatted);
+    const ok = parseDateNaissance(formatted);
+    setDateError(ok ? "" : "Date invalide ou future");
+  };
+
+  const datePickerValue = useMemo(() => {
+    const p = parseDateNaissance(form.dateNaissance);
+    if (!p) return "";
+    return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+  }, [form.dateNaissance]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!form.acceptReglement) {
       alert("Veuillez accepter le règlement.");
+      return;
+    }
+    if (!parseDateNaissance(form.dateNaissance)) {
+      alert("Date de naissance invalide.");
+      return;
+    }
+    if (!categorieResult) {
+      alert("Impossible de déterminer la catégorie pour cette course et cette date de naissance.");
+      return;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      alert("Adresse e-mail invalide.");
       return;
     }
     setLoading(true);
@@ -113,7 +248,8 @@ export default function InscriptionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          montantDeclare: prices[form.course] || 0,
+          placesNavette: form.navette === "Oui" ? form.placesNavette : 0,
+          tailleTee: showTee ? form.tailleTee : "",
         }),
       });
       const data = await res.json();
@@ -129,10 +265,7 @@ export default function InscriptionPage() {
     setLoading(false);
   };
 
-  const categories = form.course ? COURSE_CATEGORIES[form.course] || [] : [];
-  const price = form.course ? prices[form.course] : null;
-
-  if (!settingsLoaded) {
+  if (!loaded) {
     return <div className="p-20 text-center text-stone-500">Chargement...</div>;
   }
 
@@ -141,9 +274,7 @@ export default function InscriptionPage() {
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <div className="bg-white rounded-2xl border border-stone-200 p-12">
           <h1 className="text-3xl font-bold text-[#1F2C3F] mb-4">Inscriptions fermées</h1>
-          <p className="text-stone-600">
-            Les inscriptions ne sont pas ouvertes pour le moment. Revenez plus tard.
-          </p>
+          <p className="text-stone-600">Les inscriptions ne sont pas ouvertes pour le moment.</p>
         </div>
       </div>
     );
@@ -155,7 +286,12 @@ export default function InscriptionPage() {
         <div className="bg-white rounded-2xl border border-stone-200 p-12">
           <h1 className="text-3xl font-bold text-[#1F2C3F] mb-4">Inscription enregistrée</h1>
           <p className="text-lg text-stone-700 mb-2">Votre référence :</p>
-          <p className="text-2xl font-mono font-bold text-[#A1532D] mb-6">{reference}</p>
+          <p className="text-2xl font-mono font-bold text-[#A1532D] mb-4">{reference}</p>
+          {categorieResult && (
+            <p className="text-stone-600 mb-2">
+              Catégorie : <strong>{categorieResult}</strong>
+            </p>
+          )}
           <p className="text-stone-600">
             Statut : <strong>En attente</strong>
           </p>
@@ -169,21 +305,144 @@ export default function InscriptionPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-16">
-      <h1 className="text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
-      <p className="text-stone-600 mb-10">Étape {step} sur 3</p>
+    <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
+      <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
+      <p className="text-stone-600 mb-8">
+        Remplissez le formulaire en une seule page. Les champs marqués * sont obligatoires.
+      </p>
 
-      <div className="bg-white rounded-2xl border border-stone-200 p-8">
-        {step === 1 && (
-          <div className="space-y-5">
-            <h2 className="text-xl font-semibold text-[#1F2C3F]">Course & identité</h2>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Course *</label>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* 1. Personnelles */}
+        <Section title="1. Informations personnelles">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Prénom" required>
+              <input
+                className={inputCls}
+                value={form.prenom}
+                onChange={(e) => set("prenom", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Nom" required>
+              <input
+                className={inputCls}
+                value={form.nom}
+                onChange={(e) => set("nom", e.target.value)}
+                required
+              />
+            </Field>
+          </div>
+
+          <Field label="Date de naissance" required>
+            <div className="flex gap-2 items-center">
+              <input
+                className={inputCls}
+                inputMode="numeric"
+                placeholder="JJ/MM/AAAA ou 15061995"
+                value={form.dateNaissance}
+                onChange={onDateKeyboard}
+                maxLength={10}
+                required
+              />
+              <label className="shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
+                <span className="sr-only">Calendrier</span>
+                <input
+                  type="date"
+                  className="absolute opacity-0 w-0 h-0"
+                  value={datePickerValue}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={onDatePicker}
+                />
+                📅
+              </label>
+            </div>
+            {dateError && <p className="text-sm text-red-600 mt-1">{dateError}</p>}
+            <p className="text-xs text-stone-500 mt-1">
+              Tapez les 8 chiffres (ex. 15061995) ou utilisez le calendrier.
+            </p>
+          </Field>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Genre" required>
               <select
-                name="course"
+                className={inputCls}
+                value={form.genre}
+                onChange={(e) => set("genre", e.target.value)}
+                required
+              >
+                <option value="">Choisir</option>
+                <option>Homme</option>
+                <option>Femme</option>
+              </select>
+            </Field>
+            <Field label="Nationalité">
+              <input
+                className={inputCls}
+                value={form.nationalite}
+                onChange={(e) => set("nationalite", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Téléphone" required>
+              <input
+                className={inputCls}
+                value={form.telephone}
+                onChange={(e) => set("telephone", e.target.value)}
+                required
+              />
+            </Field>
+            <Field label="E-mail (facultatif)">
+              <input
+                type="email"
+                className={inputCls}
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <Field label="Adresse">
+            <input
+              className={inputCls}
+              value={form.adresse}
+              onChange={(e) => set("adresse", e.target.value)}
+            />
+          </Field>
+
+          <Field label="Numéro d'identité ou passeport" required>
+            <input
+              className={inputCls}
+              value={form.numeroIdentite}
+              onChange={(e) => set("numeroIdentite", e.target.value)}
+              required
+            />
+          </Field>
+        </Section>
+
+        {/* 2. Sportives */}
+        <Section title="2. Informations sportives">
+          <Field label="Course" required>
+            {courseParam && form.course === courseParam ? (
+              <div className="space-y-2">
+                <p className="font-semibold text-[#1F2C3F] text-lg">{form.course}</p>
+                <p className="text-sm text-[#A1532D]">
+                  {(prices[form.course] || 0).toLocaleString("fr-MG")} Ar
+                </p>
+                <button
+                  type="button"
+                  className="text-sm text-stone-500 underline"
+                  onClick={() => set("course", "")}
+                >
+                  Changer de course
+                </button>
+              </div>
+            ) : (
+              <select
+                className={inputCls}
                 value={form.course}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
+                onChange={(e) => set("course", e.target.value)}
                 required
               >
                 <option value="">Choisir une course</option>
@@ -193,317 +452,221 @@ export default function InscriptionPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            {categories.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Catégorie *</label>
-                <select
-                  name="categorie"
-                  value={form.categorie}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                >
-                  <option value="">Choisir</option>
-                  {categories.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Prénom *</label>
-                <input
-                  name="prenom"
-                  value={form.prenom}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Nom *</label>
-                <input
-                  name="nom"
-                  value={form.nom}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                  required
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Date de naissance (JJ/MM/AAAA) *
-                </label>
-                <input
-                  name="dateNaissance"
-                  value={form.dateNaissance}
-                  onChange={handleChange}
-                  placeholder="01/01/1990"
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Genre *</label>
-                <select
-                  name="genre"
-                  value={form.genre}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                >
-                  <option value="">Choisir</option>
-                  <option>Homme</option>
-                  <option>Femme</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Nationalité</label>
-              <input
-                name="nationalite"
-                value={form.nationalite}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              />
-            </div>
-            <button
-              onClick={() => setStep(2)}
-              className="w-full bg-[#1F2C3F] text-white py-3 rounded-full font-medium"
-            >
-              Continuer
-            </button>
-          </div>
-        )}
+          </Field>
 
-        {step === 2 && (
-          <div className="space-y-5">
-            <h2 className="text-xl font-semibold text-[#1F2C3F]">Coordonnées</h2>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Email *</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              />
+          {categorieResult ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm">
+              Catégorie calculée automatiquement :{" "}
+              <strong className="text-green-900">{categorieResult}</strong>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Téléphone *</label>
-              <input
-                name="telephone"
-                value={form.telephone}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              />
+          ) : form.dateNaissance && form.genre && form.course ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
+              Aucune catégorie pour cette date de naissance et cette course. Vérifiez la date ou
+              choisissez une autre épreuve.
             </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Adresse</label>
-              <input
-                name="adresse"
-                value={form.adresse}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Organisation / Club</label>
-              <input
-                name="organisation"
-                value={form.organisation}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Taille tee-shirt</label>
+          ) : (
+            <p className="text-sm text-stone-500">
+              La catégorie sera calculée automatiquement selon votre date de naissance, votre genre
+              et la course.
+            </p>
+          )}
+
+          <Field label="Organisation / Club">
+            <input
+              className={inputCls}
+              value={form.organisation}
+              onChange={(e) => set("organisation", e.target.value)}
+            />
+          </Field>
+
+          {showTee && (
+            <Field label="Taille de t-shirt">
               <select
-                name="tailleTee"
+                className={inputCls}
                 value={form.tailleTee}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
+                onChange={(e) => set("tailleTee", e.target.value)}
               >
                 <option value="">Choisir</option>
-                <option>XS</option>
-                <option>S</option>
-                <option>M</option>
-                <option>L</option>
-                <option>XL</option>
-                <option>XXL</option>
+                {teeSizes.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Contact d&apos;urgence
-                </label>
-                <input
-                  name="contactUrgence"
-                  value={form.contactUrgence}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Téléphone d&apos;urgence
-                </label>
-                <input
-                  name="telephoneUrgence"
-                  value={form.telephoneUrgence}
-                  onChange={handleChange}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                />
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 border border-stone-300 py-3 rounded-full font-medium"
-              >
-                Retour
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                className="flex-1 bg-[#1F2C3F] text-white py-3 rounded-full font-medium"
-              >
-                Continuer
-              </button>
-            </div>
-          </div>
-        )}
+            </Field>
+          )}
+          {form.course === "Zaza Tafaray" && (
+            <p className="text-sm text-stone-500">Zaza Tafaray : pas de t-shirt fourni.</p>
+          )}
+        </Section>
 
-        {step === 3 && (
-          <div className="space-y-5">
-            <h2 className="text-xl font-semibold text-[#1F2C3F]">Paiement & validation</h2>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">
-                Numéro d&apos;identité ou passeport *
-              </label>
+        {/* 3. Urgence */}
+        <Section title="3. Contact d'urgence">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Nom du contact">
               <input
-                name="numeroIdentite"
-                value={form.numeroIdentite}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
+                className={inputCls}
+                value={form.contactUrgence}
+                onChange={(e) => set("contactUrgence", e.target.value)}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-stone-700 mb-1">Navette</label>
-              <select
-                name="navette"
-                value={form.navette}
-                onChange={handleChange}
-                className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              >
-                <option>Non</option>
-                <option>Oui</option>
-              </select>
+            </Field>
+            <Field label="Téléphone d'urgence">
+              <input
+                className={inputCls}
+                value={form.telephoneUrgence}
+                onChange={(e) => set("telephoneUrgence", e.target.value)}
+              />
+            </Field>
+          </div>
+        </Section>
+
+        {/* 4. Navette */}
+        <Section title="4. Transport et navette">
+          <Field label="Navette">
+            <select
+              className={inputCls}
+              value={form.navette}
+              onChange={(e) => set("navette", e.target.value)}
+            >
+              <option>Non</option>
+              <option>Oui</option>
+            </select>
+          </Field>
+          {form.navette === "Oui" && (
+            <Field label="Nombre de places navette">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className={inputCls}
+                value={form.placesNavette}
+                onChange={(e) => set("placesNavette", Number(e.target.value))}
+              />
+            </Field>
+          )}
+          <p className="text-sm text-stone-500">
+            Tarif navette : {(settings.tarif_navette || 20000).toLocaleString("fr-MG")} Ar / personne
+            (modifiable dans l&apos;admin).
+          </p>
+        </Section>
+
+        {/* 5. Paiement */}
+        <Section title="5. Paiement Mobile Money">
+          <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
+            <div className="flex justify-between">
+              <span>Inscription {form.course || "—"}</span>
+              <span>{totals.prixCourse.toLocaleString("fr-MG")} Ar</span>
             </div>
             {form.navette === "Oui" && (
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Nombre de places navette
-                </label>
-                <input
-                  type="number"
-                  name="placesNavette"
-                  value={form.placesNavette}
-                  onChange={handleChange}
-                  min={1}
-                  className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                />
+              <div className="flex justify-between">
+                <span>
+                  Navette × {totals.places}
+                </span>
+                <span>{totals.navette.toLocaleString("fr-MG")} Ar</span>
               </div>
             )}
-
-            <div className="border-t pt-5">
-              <h3 className="font-medium text-[#1F2C3F] mb-3">Paiement Mobile Money</h3>
-              <p className="text-sm text-stone-600 mb-1">
-                Montant à payer :{" "}
-                <strong>{price ? price.toLocaleString("fr-MG") + " Ar" : "—"}</strong>
-              </p>
-              <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-4">
-                <p className="font-medium text-[#1F2C3F]">Numéros de réception :</p>
-                {settings.mobile_money_mvola && (
-                  <p>MVola : <strong>{settings.mobile_money_mvola}</strong></p>
-                )}
-                {settings.mobile_money_orange && (
-                  <p>Orange Money : <strong>{settings.mobile_money_orange}</strong></p>
-                )}
-                {settings.mobile_money_airtel && (
-                  <p>Airtel Money : <strong>{settings.mobile_money_airtel}</strong></p>
-                )}
-                {!settings.mobile_money_mvola &&
-                  !settings.mobile_money_orange &&
-                  !settings.mobile_money_airtel && (
-                    <p className="text-stone-500">
-                      Les numéros seront affichés dès qu&apos;ils seront renseignés dans l&apos;admin.
-                    </p>
-                  )}
+            {totals.frais > 0 && (
+              <div className="flex justify-between">
+                <span>Frais de retrait</span>
+                <span>{totals.frais.toLocaleString("fr-MG")} Ar</span>
               </div>
-              <p className="text-sm text-stone-600 mb-3">
-                Effectuez le paiement puis renseignez la référence de transaction ci-dessous.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">Opérateur</label>
-                  <select
-                    name="operateur"
-                    value={form.operateur}
-                    onChange={handleChange}
-                    className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                  >
-                    <option value="">Choisir</option>
-                    <option>MVola</option>
-                    <option>Orange Money</option>
-                    <option>Airtel Money</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-stone-700 mb-1">
-                    Référence transaction
-                  </label>
-                  <input
-                    name="referencePaiement"
-                    value={form.referencePaiement}
-                    onChange={handleChange}
-                    className="w-full border border-stone-300 rounded-lg px-4 py-3"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <label className="flex items-start gap-3 text-sm">
-              <input
-                type="checkbox"
-                name="acceptReglement"
-                checked={form.acceptReglement}
-                onChange={handleChange}
-                className="mt-1"
-              />
-              <span>
-                J&apos;accepte le règlement de participation et la politique de confidentialité.
-              </span>
-            </label>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setStep(2)}
-                className="flex-1 border border-stone-300 py-3 rounded-full font-medium"
-              >
-                Retour
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex-1 bg-[#1F2C3F] text-white py-3 rounded-full font-medium hover:bg-[#2a3d55] disabled:opacity-50"
-              >
-                {loading ? "Enregistrement..." : "Valider mon inscription"}
-              </button>
+            )}
+            <div className="flex justify-between font-bold text-[#1F2C3F] border-t border-stone-200 pt-2 mt-2">
+              <span>TOTAL À PAYER</span>
+              <span>{totals.total.toLocaleString("fr-MG")} Ar</span>
             </div>
           </div>
-        )}
-      </div>
+
+          <Field label="Opérateur">
+            <select
+              className={inputCls}
+              value={form.operateur}
+              onChange={(e) => set("operateur", e.target.value)}
+            >
+              <option value="">Choisir</option>
+              <option>MVola</option>
+              <option>Orange Money</option>
+              <option>Airtel Money</option>
+            </select>
+          </Field>
+
+          {form.operateur && (
+            <div className="bg-[#1F2C3F]/5 border border-stone-200 rounded-xl p-4 text-sm space-y-1">
+              <p>
+                <strong>Bénéficiaire :</strong> {settings.mm_beneficiaire || "Association Trail Tafaray"}
+              </p>
+              {settings.mm_titulaire && (
+                <p>
+                  <strong>Titulaire :</strong> {settings.mm_titulaire}
+                </p>
+              )}
+              <p>
+                <strong>Opérateur :</strong> {form.operateur}
+              </p>
+              {mmNumber && (
+                <p>
+                  <strong>Numéro :</strong> {mmNumber}
+                </p>
+              )}
+              <p>
+                <strong>Montant à transférer :</strong>{" "}
+                {totals.total.toLocaleString("fr-MG")} Ar
+              </p>
+              {settings.mm_instructions && (
+                <p className="text-stone-600 mt-2">{settings.mm_instructions}</p>
+              )}
+            </div>
+          )}
+
+          <Field label="Référence de transaction">
+            <input
+              className={inputCls}
+              value={form.referencePaiement}
+              onChange={(e) => set("referencePaiement", e.target.value)}
+              placeholder="Référence reçue après le transfert"
+            />
+          </Field>
+        </Section>
+
+        {/* 6. Règlement */}
+        <Section title="6. Acceptation du règlement">
+          <label className="flex items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={form.acceptReglement}
+              onChange={(e) => set("acceptReglement", e.target.checked)}
+              required
+            />
+            <span>
+              J&apos;accepte le{" "}
+              <a href="/reglement" className="underline text-[#A1532D]" target="_blank">
+                règlement de participation
+              </a>{" "}
+              et la{" "}
+              <a href="/confidentialite" className="underline text-[#A1532D]" target="_blank">
+                politique de confidentialité
+              </a>
+              .
+            </span>
+          </label>
+        </Section>
+
+        <button
+          type="submit"
+          disabled={loading || !categorieResult}
+          className="w-full bg-[#1F2C3F] text-white py-4 rounded-full font-semibold text-lg hover:bg-[#2a3d55] disabled:opacity-50"
+        >
+          {loading ? "Enregistrement..." : "Valider mon inscription"}
+        </button>
+      </form>
     </div>
+  );
+}
+
+export default function InscriptionPage() {
+  return (
+    <Suspense fallback={<div className="p-20 text-center">Chargement...</div>}>
+      <InscriptionForm />
+    </Suspense>
   );
 }

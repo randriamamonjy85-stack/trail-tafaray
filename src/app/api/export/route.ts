@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminSession } from "@/lib/supabase/require-admin";
+
+/** Anti CSV injection : préfixer si commence par = + - @ */
+function csvSafe(val: unknown): string {
+  let s = String(val ?? "");
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return `"${s.replace(/"/g, '""')}"`;
+}
 
 function toCsvRow(row: any): string {
   const fields = [
@@ -24,28 +31,28 @@ function toCsvRow(row: any): string {
     "Validé",
     row.cree_le,
   ];
-  return fields.map((f) => `"${String(f ?? "").replace(/"/g, '""')}"`).join(";");
+  return fields.map(csvSafe).join(";");
 }
 
 export async function GET(request: Request) {
+  const gate = await requireAdminSession();
+  if (gate.response) return gate.response;
+
   const { searchParams } = new URL(request.url);
   const onlyNew = searchParams.get("onlyNew") === "true";
 
-  const supabase = createAdminClient();
-  let query = supabase
-    .from("inscriptions")
-    .select("*")
-    .eq("statut", "Validé");
-
-  if (onlyNew) {
-    query = query.eq("exporte", false);
-  }
+  const supabase = gate.admin!;
+  let query = supabase.from("inscriptions").select("*").eq("statut", "Validé");
+  if (onlyNew) query = query.eq("exporte", false);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (!data || data.length === 0) {
-    return NextResponse.json({ error: "Aucune inscription validée à exporter" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Aucune inscription validée à exporter" },
+      { status: 404 }
+    );
   }
 
   const header =
@@ -53,7 +60,6 @@ export async function GET(request: Request) {
   const rows = data.map(toCsvRow);
   const csv = [header, ...rows].join("\n");
 
-  // Marquer comme exporté
   const ids = data.map((d) => d.id);
   await supabase
     .from("inscriptions")

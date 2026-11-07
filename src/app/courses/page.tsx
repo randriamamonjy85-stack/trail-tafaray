@@ -37,16 +37,18 @@ export default async function CoursesPage() {
             <p className="text-sm font-medium text-[#A1532D] mb-4">
               {(tarifs[course.name] || 0).toLocaleString("fr-MG")} Ar
             </p>
-            {settings.inscriptions_ouvertes ? (
-              <Link
-                href="/inscription"
-                className="inline-block bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#8a4526]"
-              >
-                S&apos;inscrire
-              </Link>
-            ) : (
-              <span className="text-sm text-stone-500">Inscriptions fermées</span>
-            )}
+            <div className="flex flex-wrap gap-3">
+              {settings.inscriptions_ouvertes ? (
+                <Link
+                  href={`/inscription?course=${encodeURIComponent(course.name)}`}
+                  className="inline-block bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#8a4526]"
+                >
+                  S&apos;inscrire
+                </Link>
+              ) : (
+                <span className="text-sm text-stone-500">Inscriptions fermées</span>
+              )}
+            </div>
           </div>
         ))}
       </div>

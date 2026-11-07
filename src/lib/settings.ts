@@ -18,9 +18,20 @@ export type SiteSettings = {
   tarif_intense: number;
   tarif_vtt: number;
   tarif_duathlon: number;
+  tarif_navette: number;
   mobile_money_mvola: string;
   mobile_money_orange: string;
   mobile_money_airtel: string;
+  mm_beneficiaire: string;
+  mm_titulaire: string;
+  mm_instructions: string;
+  mm_frais_mode: string;
+  mm_frais_mvola: number;
+  mm_frais_orange: number;
+  mm_frais_airtel: number;
+  hero_image_url: string;
+  tee_sizes: string;
+  annee_reference_categories: number;
 };
 
 const defaults: SiteSettings = {
@@ -42,9 +53,20 @@ const defaults: SiteSettings = {
   tarif_intense: 45000,
   tarif_vtt: 40000,
   tarif_duathlon: 50000,
+  tarif_navette: 20000,
   mobile_money_mvola: "",
   mobile_money_orange: "",
   mobile_money_airtel: "",
+  mm_beneficiaire: "Association Trail Tafaray",
+  mm_titulaire: "",
+  mm_instructions: "Effectuez le transfert puis indiquez la référence de transaction.",
+  mm_frais_mode: "fixe",
+  mm_frais_mvola: 0,
+  mm_frais_orange: 0,
+  mm_frais_airtel: 0,
+  hero_image_url: "",
+  tee_sizes: "S,M,L,XL,XXL",
+  annee_reference_categories: 2026,
 };
 
 export async function getSettings(): Promise<SiteSettings> {

@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminSession } from "@/lib/supabase/require-admin";
 
 export async function POST(request: Request) {
+  const gate = await requireAdminSession();
+  if (gate.response) return gate.response;
+
   const body = await request.json();
-  const { id, action } = body; // action: "valider" | "refuser"
+  const { id, action } = body;
 
   if (!id || !["valider", "refuser"].includes(action)) {
     return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
   }
 
   const statut = action === "valider" ? "Validé" : "Refusé";
-  const supabase = createAdminClient();
-
-  const { error } = await supabase
+  const { error } = await gate.admin!
     .from("inscriptions")
     .update({ statut })
     .eq("id", id);

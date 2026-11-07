@@ -29,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/courses" className="text-stone-700 hover:text-[#A1532D]">Courses</a>
                 <a href="/inscription" className="text-stone-700 hover:text-[#A1532D]">Inscription</a>
                 <a href="/resultats" className="text-stone-700 hover:text-[#A1532D]">Résultats</a>
+                <a href="/galerie" className="text-stone-700 hover:text-[#A1532D]">Galerie</a>
                 <a href="/partenaires" className="text-stone-700 hover:text-[#A1532D]">Partenaires</a>
                 <a href="/contact" className="text-stone-700 hover:text-[#A1532D]">Contact</a>
               </nav>

@@ -1,12 +1,19 @@
-export default function MentionsLegales() {
+import { getSettings } from "@/lib/settings";
+
+export const dynamic = "force-dynamic";
+
+export default async function MentionsPage() {
+  const settings = await getSettings();
+  const content =
+    (settings as any).mentions_legales ||
+    "Mentions légales de l'Association Trail Tafaray. Contenu à compléter depuis l'administration.";
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-16 prose prose-stone">
+    <div className="max-w-3xl mx-auto px-4 py-16">
       <h1 className="text-4xl font-bold text-[#1F2C3F] mb-8">Mentions légales</h1>
-      <p>Association Trail Tafaray<br />Anjeva, Madagascar</p>
-      <p>Email : contact@trailtafaray.mg</p>
-      <p>Directeur de la publication : Association Trail Tafaray</p>
-      <p>Hébergement : Vercel Inc. (ou hébergeur choisi)</p>
-      <p className="text-sm text-stone-500 mt-8">Page à compléter avec les informations légales exactes de l'association.</p>
+      <div className="bg-white rounded-2xl border border-stone-200 p-8 prose prose-stone max-w-none whitespace-pre-line text-stone-700">
+        {content}
+      </div>
     </div>
   );
 }

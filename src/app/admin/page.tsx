@@ -562,6 +562,29 @@ export default function AdminPage() {
               onChange={(e) => setSettings({ ...settings, hero_sous_titre: e.target.value })}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">IMAGE PRINCIPALE DE LA PAGE D&apos;ACCUEIL (URL)</label>
+            <input
+              className="w-full border border-stone-300 rounded-lg px-4 py-2 mb-2"
+              placeholder="https://... ou uploadez ci-dessous"
+              value={(settings as any).hero_image_url || ""}
+              onChange={(e) => setSettings({ ...settings, hero_image_url: e.target.value } as any)}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const url = await uploadImage(f, "hero");
+                if (url) setSettings({ ...settings, hero_image_url: url } as any);
+              }}
+            />
+            {(settings as any).hero_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(settings as any).hero_image_url} alt="Hero" className="mt-2 h-32 object-cover rounded-lg" />
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Date de l&apos;événement (ISO)</label>
@@ -625,6 +648,31 @@ export default function AdminPage() {
             ))}
           </div>
 
+          <h3 className="text-lg font-semibold text-[#1F2C3F] pt-4">Pages légales</h3>
+          <div>
+            <label className="block text-sm font-medium mb-1">Mentions légales</label>
+            <textarea className="w-full border border-stone-300 rounded-lg px-4 py-2" rows={5}
+              value={(settings as any).mentions_legales || ""}
+              onChange={(e) => setSettings({ ...settings, mentions_legales: e.target.value } as any)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Politique de confidentialité</label>
+            <textarea className="w-full border border-stone-300 rounded-lg px-4 py-2" rows={5}
+              value={(settings as any).politique_confidentialite || ""}
+              onChange={(e) => setSettings({ ...settings, politique_confidentialite: e.target.value } as any)} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Règlement de participation</label>
+            <textarea className="w-full border border-stone-300 rounded-lg px-4 py-2" rows={5}
+              value={settings.texte_reglement || ""}
+              onChange={(e) => setSettings({ ...settings, texte_reglement: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Texte CTA partenaires</label>
+            <textarea className="w-full border border-stone-300 rounded-lg px-4 py-2" rows={2}
+              value={(settings as any).texte_partenaires_cta || ""}
+              onChange={(e) => setSettings({ ...settings, texte_partenaires_cta: e.target.value } as any)} />
+          </div>
           <button
             onClick={saveSettings}
             className="bg-[#1F2C3F] text-white px-6 py-3 rounded-full font-medium"

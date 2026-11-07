@@ -2,12 +2,14 @@ import Link from "next/link";
 import Image from "next/image";
 import Countdown from "@/components/Countdown";
 import { getSettings, getTarifs } from "@/lib/settings";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const settings = await getSettings();
   const tarifs = getTarifs(settings);
+  const supabase = await createClient();
 
   const courses = [
     { name: "Zaza Tafaray", distance: "5 KM", type: "RUN" },
@@ -17,6 +19,29 @@ export default async function Home() {
     { name: "VTT BEKA", distance: "31 KM", type: "BIKE" },
     { name: "Duathlon Nature", distance: "24 KM", type: "RUN · BIKE" },
   ];
+
+  let partenaires: any[] = [];
+  let photos: any[] = [];
+  try {
+    if (settings.partenaires_visibles) {
+      const { data } = await supabase
+        .from("partenaires")
+        .select("*")
+        .eq("visible", true)
+        .order("ordre")
+        .limit(8);
+      partenaires = data || [];
+    }
+    const { data: ph } = await supabase
+      .from("photos")
+      .select("*")
+      .eq("visible", true)
+      .order("ordre")
+      .limit(8);
+    photos = ph || [];
+  } catch {
+    /* ignore */
+  }
 
   const dateAffichee = settings.date_evenement
     ? new Date(settings.date_evenement).toLocaleDateString("fr-FR", {
@@ -30,6 +55,9 @@ export default async function Home() {
   const heroBg =
     (settings as any).hero_image_url ||
     "https://images.unsplash.com/photo-1551632811-561732d1e306?auto=format&fit=crop&w=2000&q=80";
+
+  const emailPart = (settings as any).email_partenariat || "trailtafaray@gmail.com";
+  const mailto = `mailto:${emailPart}?subject=${encodeURIComponent("Demande de partenariat – Association Trail Tafaray")}`;
 
   return (
     <div>
@@ -125,6 +153,92 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {photos.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-end mb-8">
+              <h2 className="text-3xl font-bold text-[#1F2C3F]">Galerie</h2>
+              <Link href="/galerie" className="text-sm text-[#A1532D] hover:underline">
+                Voir tout →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {photos.map((p) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={p.id}
+                  src={p.url}
+                  alt={p.titre || ""}
+                  className="w-full h-40 object-cover rounded-xl"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {settings.partenaires_visibles && (
+        <section className="py-16 bg-stone-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-end mb-8">
+              <h2 className="text-3xl font-bold text-[#1F2C3F]">Partenaires</h2>
+              <Link href="/partenaires" className="text-sm text-[#A1532D] hover:underline">
+                Tous les partenaires →
+              </Link>
+            </div>
+            {partenaires.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+                {partenaires.map((p) =>
+                  p.site_url ? (
+                    <a
+                      key={p.id}
+                      href={p.site_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-white rounded-xl border border-stone-200 p-4 flex items-center justify-center h-28 hover:shadow-md"
+                    >
+                      {p.logo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.logo_url} alt={p.nom} className="max-h-16 object-contain" />
+                      ) : (
+                        <span className="text-sm font-medium text-center">{p.nom}</span>
+                      )}
+                    </a>
+                  ) : (
+                    <div
+                      key={p.id}
+                      className="bg-white rounded-xl border border-stone-200 p-4 flex items-center justify-center h-28"
+                    >
+                      {p.logo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.logo_url} alt={p.nom} className="max-h-16 object-contain" />
+                      ) : (
+                        <span className="text-sm font-medium text-center">{p.nom}</span>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <p className="text-stone-500 mb-8">Partenaires à venir.</p>
+            )}
+            <div className="bg-[#1F2C3F] text-white rounded-2xl p-8 text-center">
+              <h3 className="text-xl font-bold mb-3">Devenez partenaire de Trail Tafaray</h3>
+              <p className="text-stone-300 text-sm max-w-xl mx-auto mb-6">
+                {(settings as any).texte_partenaires_cta ||
+                  "Soutenez nos événements et associez votre image à Trail Tafaray."}
+              </p>
+              <a
+                href={mailto}
+                className="inline-block bg-[#A1532D] px-6 py-3 rounded-full font-semibold text-sm hover:bg-[#8a4526]"
+              >
+                Devenir partenaire
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="py-16 bg-[#1F2C3F] text-white text-center">
         <div className="max-w-3xl mx-auto px-4">

@@ -213,6 +213,18 @@ export default function AdminPage() {
     }
   };
 
+  const deleteInscription = async (id: string, label: string) => {
+    if (!confirm(`Supprimer définitivement l'inscription de ${label} ?\nCette action est irréversible.`)) return;
+    const res = await fetch("/api/inscriptions/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || "Erreur suppression");
+    else loadInscriptions();
+  };
+
   const saveSettings = async () => {
     const { error } = await supabase
       .from("site_settings")
@@ -518,22 +530,30 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td className="p-3">
-                      {i.statut === "En attente" && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => actionInscription(i.id, "valider")}
-                            className="text-green-700 text-xs font-medium hover:underline"
-                          >
-                            Valider
-                          </button>
-                          <button
-                            onClick={() => actionInscription(i.id, "refuser")}
-                            className="text-red-700 text-xs font-medium hover:underline"
-                          >
-                            Refuser
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {i.statut === "En attente" && (
+                          <>
+                            <button
+                              onClick={() => actionInscription(i.id, "valider")}
+                              className="text-green-700 text-xs font-medium hover:underline"
+                            >
+                              Valider
+                            </button>
+                            <button
+                              onClick={() => actionInscription(i.id, "refuser")}
+                              className="text-red-700 text-xs font-medium hover:underline"
+                            >
+                              Refuser
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => deleteInscription(i.id, `${i.prenom} ${i.nom}`)}
+                          className="text-stone-500 text-xs font-medium hover:underline hover:text-red-700"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

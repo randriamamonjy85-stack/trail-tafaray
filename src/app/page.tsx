@@ -6,19 +6,31 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+const FALLBACK_COURSES = [
+  { nom: "Zaza Tafaray", slug: "zaza-tafaray", distance: "5 KM", type_epreuve: "RUN", tarif: 15000, image_url: "" },
+  { nom: "Trail Découverte", slug: "trail-decouverte", distance: "12 KM", type_epreuve: "RUN", tarif: 25000, image_url: "" },
+  { nom: "Trail Endurance", slug: "trail-endurance", distance: "25 KM", type_epreuve: "RUN", tarif: 35000, image_url: "" },
+  { nom: "Trail Intense", slug: "trail-intense", distance: "35 KM", type_epreuve: "RUN", tarif: 45000, image_url: "" },
+  { nom: "VTT BEKA", slug: "vtt-beka", distance: "31 KM", type_epreuve: "BIKE", tarif: 40000, image_url: "" },
+  { nom: "Duathlon Nature", slug: "duathlon-nature", distance: "24 KM", type_epreuve: "RUN · BIKE", tarif: 50000, image_url: "" },
+];
+
 export default async function Home() {
   const settings = await getSettings();
   const tarifs = getTarifs(settings);
   const supabase = await createClient();
 
-  const courses = [
-    { name: "Zaza Tafaray", distance: "5 KM", type: "RUN" },
-    { name: "Trail Découverte", distance: "12 KM", type: "RUN" },
-    { name: "Trail Endurance", distance: "25 KM", type: "RUN" },
-    { name: "Trail Intense", distance: "35 KM", type: "RUN" },
-    { name: "VTT BEKA", distance: "31 KM", type: "BIKE" },
-    { name: "Duathlon Nature", distance: "24 KM", type: "RUN · BIKE" },
-  ];
+  let courses: any[] = [];
+  try {
+    const { data } = await supabase
+      .from("courses")
+      .select("*")
+      .eq("active", true)
+      .order("ordre");
+    courses = data && data.length ? data : FALLBACK_COURSES;
+  } catch {
+    courses = FALLBACK_COURSES;
+  }
 
   let partenaires: any[] = [];
   let photos: any[] = [];
@@ -119,6 +131,7 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Courses depuis la base — image + En savoir plus */}
       <section className="py-20 bg-stone-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center text-[#1F2C3F] mb-4">
@@ -129,27 +142,63 @@ export default async function Home() {
               "Six formats pour tous les niveaux, du trail découverte au duathlon nature."}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((c) => (
-              <div
-                key={c.name}
-                className="bg-white rounded-2xl p-6 border border-stone-200"
-              >
-                <div className="text-sm font-medium text-[#A1532D] mb-2">{c.type}</div>
-                <h3 className="text-xl font-bold text-[#1F2C3F] mb-2">{c.name}</h3>
-                <p className="text-2xl font-bold text-stone-800 mb-2">{c.distance}</p>
-                <p className="text-sm font-medium text-[#A1532D] mb-4">
-                  {(tarifs[c.name] || 0).toLocaleString("fr-MG")} Ar
-                </p>
-                {settings.inscriptions_ouvertes && (
-                  <Link
-                    href={`/inscription?course=${encodeURIComponent(c.name)}`}
-                    className="text-sm font-medium text-[#1F2C3F] hover:underline"
-                  >
-                    S&apos;inscrire →
-                  </Link>
-                )}
-              </div>
-            ))}
+            {courses.map((c) => {
+              const prix =
+                Number(c.tarif) ||
+                tarifs[c.nom] ||
+                0;
+              const slug = c.slug || "detail";
+              return (
+                <div
+                  key={c.id || c.nom}
+                  className="bg-white rounded-2xl border border-stone-200 overflow-hidden flex flex-col hover:shadow-md transition"
+                >
+                  {c.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.image_url}
+                      alt={c.nom}
+                      className="w-full h-44 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-44 bg-gradient-to-br from-[#1F2C3F] to-[#3d4f66] flex items-center justify-center">
+                      <span className="text-white/80 text-sm font-medium tracking-wide">
+                        {c.type_epreuve || "TRAIL"}
+                      </span>
+                    </div>
+                  )}
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="text-sm font-medium text-[#A1532D] mb-1">
+                      {c.type_epreuve || "RUN"}
+                    </div>
+                    <h3 className="text-xl font-bold text-[#1F2C3F] mb-1">{c.nom}</h3>
+                    <p className="text-2xl font-bold text-stone-800 mb-1">{c.distance}</p>
+                    {c.denivele && (
+                      <p className="text-sm text-stone-500 mb-1">D+ {c.denivele}</p>
+                    )}
+                    <p className="text-sm font-medium text-[#A1532D] mb-4">
+                      {prix.toLocaleString("fr-MG")} Ar
+                    </p>
+                    <div className="mt-auto flex flex-wrap gap-3">
+                      <Link
+                        href={`/courses/${slug}`}
+                        className="inline-block border border-stone-300 px-4 py-2 rounded-full text-sm font-medium hover:bg-stone-50"
+                      >
+                        En savoir plus
+                      </Link>
+                      {settings.inscriptions_ouvertes && (
+                        <Link
+                          href={`/inscription?course=${encodeURIComponent(c.nom)}`}
+                          className="inline-block bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#8a4526]"
+                        >
+                          S&apos;inscrire
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

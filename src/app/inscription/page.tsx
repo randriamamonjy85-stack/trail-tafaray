@@ -31,6 +31,9 @@ type Settings = {
   mm_frais_orange: number;
   mm_frais_airtel: number;
   tee_sizes: string;
+  date_reference_categories?: string;
+  annee_reference_categories?: number;
+  date_evenement?: string;
 };
 
 const defaultSettings: Settings = {
@@ -53,6 +56,8 @@ const defaultSettings: Settings = {
   mm_frais_orange: 0,
   mm_frais_airtel: 0,
   tee_sizes: "S,M,L,XL,XXL",
+  date_reference_categories: "2026-10-25",
+  annee_reference_categories: 2026,
 };
 
 function pricesFrom(s: Settings): Record<string, number> {
@@ -161,12 +166,15 @@ function InscriptionForm() {
   // Catégorie auto
   useEffect(() => {
     if (form.dateNaissance && form.genre && form.course && rules.length) {
-      const cat = computeCategory(form.dateNaissance, form.genre, form.course, rules);
+      const cat = computeCategory(form.dateNaissance, form.genre, form.course, rules, {
+        referenceDate: settings.date_reference_categories || settings.date_evenement,
+        referenceYear: settings.annee_reference_categories || 2026,
+      });
       setCategorieResult(cat);
     } else {
       setCategorieResult("");
     }
-  }, [form.dateNaissance, form.genre, form.course, rules]);
+  }, [form.dateNaissance, form.genre, form.course, rules, settings]);
 
   const totals = useMemo(() => {
     const prixCourse = form.course ? prices[form.course] || 0 : 0;
@@ -462,8 +470,7 @@ function InscriptionForm() {
             </div>
           ) : form.dateNaissance && form.genre && form.course ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
-              Aucune catégorie pour cette date de naissance et cette course. Vérifiez la date ou
-              choisissez une autre épreuve.
+              Catégorie en cours de calcul…
             </div>
           ) : (
             <p className="text-sm text-stone-500">
@@ -653,7 +660,7 @@ function InscriptionForm() {
 
         <button
           type="submit"
-          disabled={loading || !categorieResult}
+          disabled={loading || !form.dateNaissance || !form.genre || !form.course}
           className="w-full bg-[#1F2C3F] text-white py-4 rounded-full font-semibold text-lg hover:bg-[#2a3d55] disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Valider mon inscription"}

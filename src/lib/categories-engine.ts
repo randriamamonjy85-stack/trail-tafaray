@@ -1,8 +1,8 @@
-/** Calcul automatique de catégorie à partir des règles en base (années de naissance). */
+/** Calcul de catégorie par âge (min/max), avec fallback Hors catégorie (HC). */
 
 export type CategoryRule = {
   id?: string;
-  discipline: "trail" | "vtt" | "duathlon";
+  discipline: "trail" | "vtt" | "duathlon" | string;
   code_base: string;
   label_homme: string;
   label_femme: string;
@@ -15,7 +15,7 @@ export type CategoryRule = {
   actif?: boolean;
 };
 
-const COURSE_DISCIPLINE: Record<string, CategoryRule["discipline"]> = {
+const COURSE_DISCIPLINE: Record<string, string> = {
   "Zaza Tafaray": "trail",
   "Trail Découverte": "trail",
   "Trail Endurance": "trail",
@@ -24,7 +24,7 @@ const COURSE_DISCIPLINE: Record<string, CategoryRule["discipline"]> = {
   "Duathlon Nature": "duathlon",
 };
 
-export function disciplineForCourse(course: string): CategoryRule["discipline"] {
+export function disciplineForCourse(course: string): string {
   return COURSE_DISCIPLINE[course] || "trail";
 }
 
@@ -44,9 +44,7 @@ export function parseDateNaissance(input: string): { day: number; month: number;
   return { day, month, year };
 }
 
-/**
- * Formate la saisie clavier : 15061995 → 15/06/1995
- */
+/** Formate 15061995 → 15/06/1995 */
 export function formatDateInput(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
@@ -54,15 +52,56 @@ export function formatDateInput(raw: string): string {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
+/**
+ * Âge civil à la date de référence de l'événement.
+ * Si dateRef = 25/10/2026 et naissance 15/06/1995 → 31 ans.
+ * Fallback : année de référence - année de naissance.
+ */
+export function computeAge(
+  birth: { day: number; month: number; year: number },
+  referenceDate?: string | null,
+  referenceYear?: number | null
+): number {
+  let ref = new Date();
+  if (referenceDate) {
+    // accept YYYY-MM-DD or ISO
+    const d = new Date(referenceDate);
+    if (!isNaN(d.getTime())) ref = d;
+  } else if (referenceYear) {
+    ref = new Date(referenceYear, 11, 31);
+  }
+
+  let age = ref.getFullYear() - birth.year;
+  const m = ref.getMonth() + 1;
+  const day = ref.getDate();
+  if (m < birth.month || (m === birth.month && day < birth.day)) {
+    age -= 1;
+  }
+  return age;
+}
+
+const HC_HOMME = "Hors catégorie Hommes (HC)";
+const HC_FEMME = "Hors catégorie Femmes (HC)";
+
+export function horsCategorieLabel(genre: string): string {
+  return /femme|f/i.test(genre) ? HC_FEMME : HC_HOMME;
+}
+
+/**
+ * Trouve la catégorie par âge min/max.
+ * Si aucune règle ne correspond → Hors catégorie (HC).
+ */
 export function computeCategory(
   dateNaissance: string,
   genre: string,
   course: string,
-  rules: CategoryRule[]
+  rules: CategoryRule[],
+  options?: { referenceDate?: string | null; referenceYear?: number | null }
 ): string {
   const parsed = parseDateNaissance(dateNaissance);
   if (!parsed || !genre || !course) return "";
 
+  const age = computeAge(parsed, options?.referenceDate, options?.referenceYear);
   const discipline = disciplineForCourse(course);
   const isFemme = /femme|f/i.test(genre);
 
@@ -73,33 +112,26 @@ export function computeCategory(
       if (!allowed || allowed.length === 0) return true;
       return allowed.includes(course);
     })
-    .filter(
-      (r) =>
-        parsed.year >= r.annee_naissance_min && parsed.year <= r.annee_naissance_max
-    )
+    .filter((r) => {
+      // Priorité âge min/max si renseignés
+      const hasAge =
+        r.age_min != null &&
+        r.age_min !== undefined &&
+        r.age_max != null &&
+        r.age_max !== undefined;
+      if (hasAge) {
+        return age >= Number(r.age_min) && age <= Number(r.age_max);
+      }
+      // Fallback années de naissance (anciennes données)
+      if (r.annee_naissance_min && r.annee_naissance_max) {
+        return parsed.year >= r.annee_naissance_min && parsed.year <= r.annee_naissance_max;
+      }
+      return false;
+    })
     .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
 
   const rule = candidates[0];
-  if (!rule) return "";
+  if (!rule) return horsCategorieLabel(genre);
 
   return isFemme ? rule.label_femme : rule.label_homme;
-}
-
-/** Course autorise-t-elle cette année de naissance selon les règles ? */
-export function isCourseAllowedForBirthYear(
-  course: string,
-  birthYear: number,
-  rules: CategoryRule[]
-): boolean {
-  const discipline = disciplineForCourse(course);
-  return rules.some(
-    (r) =>
-      r.discipline === discipline &&
-      r.actif !== false &&
-      birthYear >= r.annee_naissance_min &&
-      birthYear <= r.annee_naissance_max &&
-      (!r.courses_autorisees ||
-        r.courses_autorisees.length === 0 ||
-        r.courses_autorisees.includes(course))
-  );
 }

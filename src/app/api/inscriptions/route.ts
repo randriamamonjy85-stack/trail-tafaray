@@ -162,14 +162,14 @@ export async function POST(request: Request) {
       .select("*")
       .eq("actif", true);
     const rules = (rulesData || []) as CategoryRule[];
-    const categorie = computeCategory(dateNaissance, genre, course, rules);
+    const categorie = computeCategory(dateNaissance, genre, course, rules, {
+      referenceDate: settings?.date_reference_categories || settings?.date_evenement,
+      referenceYear: settings?.annee_reference_categories || 2026,
+    });
+    // Toujours une catégorie (HC si hors grilles)
     if (!categorie) {
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Aucune catégorie ne correspond à cette date de naissance pour la course choisie.",
-        },
+        { success: false, error: "Impossible de calculer la catégorie." },
         { status: 400 }
       );
     }

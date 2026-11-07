@@ -23,10 +23,10 @@ const emptyRule = (discipline: string): Rule => ({
   code_base: "",
   label_homme: "",
   label_femme: "",
-  annee_naissance_min: 1990,
-  annee_naissance_max: 2000,
-  age_min: null,
-  age_max: null,
+  annee_naissance_min: 1900,
+  annee_naissance_max: 2100,
+  age_min: 18,
+  age_max: 39,
   courses_autorisees: [],
   ordre: 99,
   actif: true,
@@ -38,6 +38,8 @@ export default function CategoriesAdmin() {
   const [msg, setMsg] = useState("");
   const [adding, setAdding] = useState<Rule | null>(null);
   const [coursesList, setCoursesList] = useState<string[]>([]);
+  const [refYear, setRefYear] = useState(2026);
+  const [refDate, setRefDate] = useState("2026-10-25");
 
   const load = async () => {
     const { data } = await supabase
@@ -48,6 +50,9 @@ export default function CategoriesAdmin() {
     setRules((data as Rule[]) || []);
     const { data: courses } = await supabase.from("courses").select("nom").eq("active", true);
     if (courses?.length) setCoursesList(courses.map((c: any) => c.nom));
+    const { data: settings } = await supabase.from("site_settings").select("*").eq("id", 1).single();
+    if (settings?.annee_reference_categories) setRefYear(settings.annee_reference_categories);
+    if (settings?.date_reference_categories) setRefDate(settings.date_reference_categories);
   };
 
   useEffect(() => {
@@ -57,6 +62,17 @@ export default function CategoriesAdmin() {
   const flash = (m: string) => {
     setMsg(m);
     setTimeout(() => setMsg(""), 2500);
+  };
+
+  const saveRef = async () => {
+    await supabase
+      .from("site_settings")
+      .update({
+        annee_reference_categories: refYear,
+        date_reference_categories: refDate,
+      })
+      .eq("id", 1);
+    flash("Date de référence catégories enregistrée");
   };
 
   const updateLocal = (id: string, patch: Partial<Rule>) => {
@@ -69,10 +85,10 @@ export default function CategoriesAdmin() {
       .from("category_rules")
       .update({
         code_base: rule.code_base,
-        annee_naissance_min: Number(rule.annee_naissance_min),
-        annee_naissance_max: Number(rule.annee_naissance_max),
-        age_min: rule.age_min,
-        age_max: rule.age_max,
+        age_min: rule.age_min != null ? Number(rule.age_min) : null,
+        age_max: rule.age_max != null ? Number(rule.age_max) : null,
+        annee_naissance_min: Number(rule.annee_naissance_min) || 1900,
+        annee_naissance_max: Number(rule.annee_naissance_max) || 2100,
         label_homme: rule.label_homme,
         label_femme: rule.label_femme,
         courses_autorisees: rule.courses_autorisees || [],
@@ -103,15 +119,18 @@ export default function CategoriesAdmin() {
     if (!adding.code_base || !adding.label_homme || !adding.label_femme) {
       return alert("Code, label homme et label femme sont obligatoires.");
     }
+    if (adding.age_min == null || adding.age_max == null) {
+      return alert("Âge minimum et âge maximum sont obligatoires.");
+    }
     const { error } = await supabase.from("category_rules").insert({
       discipline: adding.discipline,
       code_base: adding.code_base,
       label_homme: adding.label_homme,
       label_femme: adding.label_femme,
-      annee_naissance_min: Number(adding.annee_naissance_min),
-      annee_naissance_max: Number(adding.annee_naissance_max),
-      age_min: adding.age_min,
-      age_max: adding.age_max,
+      age_min: Number(adding.age_min),
+      age_max: Number(adding.age_max),
+      annee_naissance_min: 1900,
+      annee_naissance_max: 2100,
       courses_autorisees: adding.courses_autorisees || [],
       ordre: Number(adding.ordre) || 99,
       actif: true,
@@ -192,21 +211,33 @@ export default function CategoriesAdmin() {
         />
       </div>
       <div>
-        <label className="text-xs text-stone-500">Année naissance min</label>
+        <label className="text-xs text-stone-500 font-semibold text-[#A1532D]">
+          Âge minimum
+        </label>
         <input
           type="number"
-          className="w-full border rounded px-2 py-1.5"
-          value={rule.annee_naissance_min}
-          onChange={(e) => onChange({ annee_naissance_min: Number(e.target.value) })}
+          min={0}
+          max={120}
+          className="w-full border-2 border-[#A1532D]/40 rounded px-2 py-1.5"
+          value={rule.age_min ?? ""}
+          onChange={(e) =>
+            onChange({ age_min: e.target.value === "" ? null : Number(e.target.value) })
+          }
         />
       </div>
       <div>
-        <label className="text-xs text-stone-500">Année naissance max</label>
+        <label className="text-xs text-stone-500 font-semibold text-[#A1532D]">
+          Âge maximum
+        </label>
         <input
           type="number"
-          className="w-full border rounded px-2 py-1.5"
-          value={rule.annee_naissance_max}
-          onChange={(e) => onChange({ annee_naissance_max: Number(e.target.value) })}
+          min={0}
+          max={120}
+          className="w-full border-2 border-[#A1532D]/40 rounded px-2 py-1.5"
+          value={rule.age_max ?? ""}
+          onChange={(e) =>
+            onChange({ age_max: e.target.value === "" ? null : Number(e.target.value) })
+          }
         />
       </div>
       <div className="sm:col-span-2">
@@ -231,15 +262,44 @@ export default function CategoriesAdmin() {
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-bold text-[#1F2C3F] mb-2">Catégories d&apos;âge</h2>
-        <p className="text-sm text-stone-600 mb-4">
-          Ajoutez, modifiez ou supprimez les catégories. Les années de naissance pilotent le calcul
-          automatique à l&apos;inscription.
+        <p className="text-sm text-stone-600 mb-2">
+          Le classement se base sur l&apos;<strong>âge minimum</strong> et l&apos;
+          <strong>âge maximum</strong> à la date de référence de l&apos;événement. Si le
+          participant ne rentre dans aucune fourchette →{" "}
+          <strong>Hors catégorie (HC)</strong> automatiquement.
         </p>
         {msg && (
           <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
             {msg}
           </p>
         )}
+        <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 flex flex-wrap gap-4 items-end mb-4">
+          <div>
+            <label className="text-xs font-medium">Date de référence (âge)</label>
+            <input
+              type="date"
+              className="block border rounded-lg px-3 py-2"
+              value={refDate}
+              onChange={(e) => setRefDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">Année de référence</label>
+            <input
+              type="number"
+              className="block border rounded-lg px-3 py-2 w-28"
+              value={refYear}
+              onChange={(e) => setRefYear(Number(e.target.value))}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={saveRef}
+            className="bg-[#1F2C3F] text-white px-4 py-2 rounded-full text-sm"
+          >
+            Enregistrer la référence
+          </button>
+        </div>
       </div>
 
       {(["trail", "vtt", "duathlon"] as const).map((disc) => (
@@ -299,10 +359,7 @@ export default function CategoriesAdmin() {
                     Actif
                   </label>
                 </div>
-                <RuleFormFields
-                  rule={r}
-                  onChange={(patch) => updateLocal(r.id!, patch)}
-                />
+                <RuleFormFields rule={r} onChange={(patch) => updateLocal(r.id!, patch)} />
                 <div className="flex gap-3">
                   <button
                     type="button"

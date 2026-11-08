@@ -110,6 +110,9 @@ export default function AdminPage() {
   const [actualites, setActualites] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [resultats, setResultats] = useState<any[]>([]);
+  const [smsTexte, setSmsTexte] = useState("");
+  const [smsMatches, setSmsMatches] = useState<any[]>([]);
+  const [smsMsg, setSmsMsg] = useState("");
   const [resultatsText, setResultatsText] = useState("");
 
   // Forms
@@ -395,6 +398,28 @@ export default function AdminPage() {
       </div>
     );
   }
+
+
+  const matchSmsPaiement = async () => {
+    setSmsMsg("");
+    const res = await fetch("/api/inscriptions/match-paiement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texte: smsTexte }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setSmsMsg(data.error || "Erreur");
+      setSmsMatches([]);
+      return;
+    }
+    setSmsMatches(data.matches || []);
+    setSmsMsg(
+      data.matches?.length
+        ? `${data.matches.length} correspondance(s) trouvée(s)`
+        : "Aucune inscription en attente ne correspond à ce texte"
+    );
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "inscriptions", label: "Inscriptions" },
@@ -860,12 +885,80 @@ export default function AdminPage() {
                 onChange={(e) => setSettings({ ...settings, mm_frais_airtel: Number(e.target.value) } as any)} />
             </div>
           </div>
+
+          <h3 className="text-lg font-semibold text-[#1F2C3F] pt-2">Moyens affichés au public</h3>
+          <p className="text-xs text-stone-500">Cochez les opérateurs visibles sur le formulaire d&apos;inscription.</p>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={(settings as any).pay_mvola_actif !== false}
+                onChange={(e) => setSettings({ ...settings, pay_mvola_actif: e.target.checked } as any)} />
+              MVola
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={(settings as any).pay_orange_actif !== false}
+                onChange={(e) => setSettings({ ...settings, pay_orange_actif: e.target.checked } as any)} />
+              Orange Money
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={(settings as any).pay_airtel_actif !== false}
+                onChange={(e) => setSettings({ ...settings, pay_airtel_actif: e.target.checked } as any)} />
+              Airtel Money
+            </label>
+          </div>
+
+          <h3 className="text-lg font-semibold text-[#1F2C3F] pt-2">Notifications après validation</h3>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!(settings as any).notif_email_actif}
+              onChange={(e) => setSettings({ ...settings, notif_email_actif: e.target.checked } as any)} />
+            E-mail automatique (nécessite RESEND_API_KEY sur Vercel)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!!(settings as any).notif_sms_actif}
+              onChange={(e) => setSettings({ ...settings, notif_sms_actif: e.target.checked } as any)} />
+            SMS automatique (nécessite Twilio sur Vercel)
+          </label>
+          <div>
+            <label className="block text-sm font-medium mb-1">Message type (placeholders: {'{prenom}'}, {'{reference}'}, {'{course}'})</label>
+            <textarea className="w-full border rounded-lg px-3 py-2" rows={3}
+              value={(settings as any).notif_message_valide || ""}
+              onChange={(e) => setSettings({ ...settings, notif_message_valide: e.target.value } as any)} />
+          </div>
+
           <button
             onClick={saveSettings}
             className="bg-[#1F2C3F] text-white px-6 py-3 rounded-full font-medium"
           >
             Enregistrer
           </button>
+
+          <h3 className="text-lg font-semibold text-[#1F2C3F] pt-6">Aide validation — coller un SMS MVola</h3>
+          <p className="text-xs text-stone-500">
+            Le site ne peut pas lire automatiquement votre téléphone. Collez ici le SMS reçu :
+            le système propose les inscriptions « En attente » dont la référence de paiement correspond.
+          </p>
+          <textarea className="w-full border rounded-lg px-3 py-2" rows={4} placeholder="Coller le SMS ici..."
+            value={smsTexte} onChange={(e) => setSmsTexte(e.target.value)} />
+          <button type="button" onClick={matchSmsPaiement}
+            className="border border-stone-300 px-4 py-2 rounded-full text-sm font-medium hover:bg-stone-50">
+            Chercher les correspondances
+          </button>
+          {smsMsg && <p className="text-sm text-stone-600">{smsMsg}</p>}
+          {smsMatches.length > 0 && (
+            <ul className="space-y-2">
+              {smsMatches.map((m) => (
+                <li key={m.id} className="bg-stone-50 border rounded-xl p-3 flex flex-wrap justify-between gap-2 items-center text-sm">
+                  <div>
+                    <strong>{m.prenom} {m.nom}</strong> — {m.course}
+                    <div className="text-xs text-stone-500">Réf. site {m.reference} · Paiement {m.referencePaiement} · {m.montantDeclare} Ar</div>
+                  </div>
+                  <button type="button" className="text-green-700 font-medium hover:underline"
+                    onClick={() => actionInscription(m.id, "valider")}>
+                    Valider
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

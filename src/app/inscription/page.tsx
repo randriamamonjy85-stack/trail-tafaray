@@ -31,6 +31,9 @@ type Settings = {
   mm_frais_orange: number;
   mm_frais_airtel: number;
   tee_sizes: string;
+  pay_mvola_actif?: boolean;
+  pay_orange_actif?: boolean;
+  pay_airtel_actif?: boolean;
   date_reference_categories?: string;
   annee_reference_categories?: number;
   date_evenement?: string;
@@ -56,9 +59,15 @@ const defaultSettings: Settings = {
   mm_frais_orange: 0,
   mm_frais_airtel: 0,
   tee_sizes: "S,M,L,XL,XXL",
+  pay_mvola_actif: true,
+  pay_orange_actif: true,
+  pay_airtel_actif: true,
   date_reference_categories: "2026-10-25",
   annee_reference_categories: 2026,
 };
+
+const inputCls =
+  "w-full border border-stone-300 rounded-lg px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F2C3F]/30 focus:border-[#1F2C3F]";
 
 function pricesFrom(s: Settings): Record<string, number> {
   return {
@@ -71,11 +80,14 @@ function pricesFrom(s: Settings): Record<string, number> {
   };
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, titleMg, children }: { title: string; titleMg?: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
       <h2 className="text-lg font-semibold text-[#1F2C3F] border-b border-stone-100 pb-2">
         {title}
+        {titleMg && (
+          <span className="block text-sm font-normal text-stone-500 mt-0.5">{titleMg}</span>
+        )}
       </h2>
       {children}
     </section>
@@ -84,17 +96,22 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({
   label,
+  labelMg,
   required,
   children,
 }: {
   label: string;
+  labelMg?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="block text-sm font-medium text-stone-700 mb-1">
-        {label}
+        <span>{label}</span>
+        {labelMg && (
+          <span className="text-stone-500 font-normal"> / {labelMg}</span>
+        )}
         {required ? " *" : ""}
       </label>
       {children}
@@ -102,7 +119,6 @@ function Field({
   );
 }
 
-const inputCls = "w-full border border-stone-300 rounded-lg px-4 py-3 text-base";
 
 function InscriptionForm() {
   const searchParams = useSearchParams();
@@ -147,6 +163,8 @@ function InscriptionForm() {
           supabase.from("site_settings").select("*").eq("id", 1).single(),
           supabase.from("category_rules").select("*").eq("actif", true).order("ordre"),
         ]);
+        if (sRes.error) console.error("site_settings:", sRes.error);
+        if (rRes.error) console.error("category_rules:", rRes.error);
         if (sRes.data) setSettings({ ...defaultSettings, ...sRes.data });
         if (rRes.data) setRules(rRes.data as CategoryRule[]);
       } finally {
@@ -316,14 +334,14 @@ function InscriptionForm() {
     <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
       <p className="text-stone-600 mb-8">
-        Remplissez le formulaire en une seule page. Les champs marqués * sont obligatoires.
+        Remplissez le formulaire en une seule page / Fenoy ity taratasy ity. Les champs * sont obligatoires / Tsy maintsy fenoina ny misy *.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 1. Personnelles */}
-        <Section title="1. Informations personnelles">
+        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Nom" required>
+            <Field label="Nom" labelMg="Anarana" required>
               <input
                 className={inputCls}
                 value={form.nom}
@@ -331,7 +349,7 @@ function InscriptionForm() {
                 required
               />
             </Field>
-            <Field label="Prénom" required>
+            <Field label="Prénom" labelMg="Fanampin'anarana" required>
               <input
                 className={inputCls}
                 value={form.prenom}
@@ -341,7 +359,7 @@ function InscriptionForm() {
             </Field>
           </div>
 
-          <Field label="Date de naissance" required>
+          <Field label="Date de naissance" labelMg="Daty nahaterahana" required>
             <div className="flex gap-2 items-center">
               <input
                 className={inputCls}
@@ -352,7 +370,7 @@ function InscriptionForm() {
                 maxLength={10}
                 required
               />
-              <label className="shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
+              <label className="relative shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
                 <span className="sr-only">Calendrier</span>
                 <input
                   type="date"
@@ -371,7 +389,7 @@ function InscriptionForm() {
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Genre" required>
+            <Field label="Genre" labelMg="Lahy / Vavy" required>
               <select
                 className={inputCls}
                 value={form.genre}
@@ -379,11 +397,11 @@ function InscriptionForm() {
                 required
               >
                 <option value="">Choisir</option>
-                <option>Homme</option>
-                <option>Femme</option>
+                <option value="Homme">Homme / Lahy</option>
+                <option value="Femme">Femme / Vavy</option>
               </select>
             </Field>
-            <Field label="Nationalité">
+            <Field label="Nationalité" labelMg="Firenena">
               <input
                 className={inputCls}
                 value={form.nationalite}
@@ -393,7 +411,7 @@ function InscriptionForm() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Téléphone" required>
+            <Field label="Téléphone" labelMg="Finday" required>
               <input
                 className={inputCls}
                 value={form.telephone}
@@ -401,7 +419,7 @@ function InscriptionForm() {
                 required
               />
             </Field>
-            <Field label="E-mail (facultatif)">
+            <Field label="E-mail (facultatif)" labelMg="Mailaka (tsy voatery)">
               <input
                 type="email"
                 className={inputCls}
@@ -411,7 +429,7 @@ function InscriptionForm() {
             </Field>
           </div>
 
-          <Field label="Adresse">
+          <Field label="Adresse" labelMg="Adiresy">
             <input
               className={inputCls}
               value={form.adresse}
@@ -419,7 +437,7 @@ function InscriptionForm() {
             />
           </Field>
 
-          <Field label="Numéro d'identité ou passeport" required>
+          <Field label="Numéro d'identité ou passeport" labelMg="Laharana karapanondro / pasipaoro" required>
             <input
               className={inputCls}
               value={form.numeroIdentite}
@@ -430,8 +448,8 @@ function InscriptionForm() {
         </Section>
 
         {/* 2. Sportives */}
-        <Section title="2. Informations sportives">
-          <Field label="Course" required>
+        <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena">
+          <Field label="Course" labelMg="Lalao / hazakazaka" required>
             {courseParam && form.course === courseParam ? (
               <div className="space-y-2">
                 <p className="font-semibold text-[#1F2C3F] text-lg">{form.course}</p>
@@ -479,7 +497,7 @@ function InscriptionForm() {
             </p>
           )}
 
-          <Field label="Organisation / Club">
+          <Field label="Organisation / Club" labelMg="Fikambanana / Club">
             <input
               className={inputCls}
               value={form.organisation}
@@ -488,7 +506,7 @@ function InscriptionForm() {
           </Field>
 
           {showTee && (
-            <Field label="Taille de t-shirt">
+            <Field label="Taille de t-shirt" labelMg="Haben'ny akanjo">
               <select
                 className={inputCls}
                 value={form.tailleTee}
@@ -507,16 +525,16 @@ function InscriptionForm() {
         </Section>
 
         {/* 3. Urgence */}
-        <Section title="3. Contact d'urgence">
+        <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Nom du contact">
+            <Field label="Nom du contact" labelMg="Anaran'ny ifandraisana maika">
               <input
                 className={inputCls}
                 value={form.contactUrgence}
                 onChange={(e) => set("contactUrgence", e.target.value)}
               />
             </Field>
-            <Field label="Téléphone d'urgence">
+            <Field label="Téléphone d'urgence" labelMg="Finday maika">
               <input
                 className={inputCls}
                 value={form.telephoneUrgence}
@@ -527,8 +545,8 @@ function InscriptionForm() {
         </Section>
 
         {/* 4. Navette */}
-        <Section title="4. Transport et navette">
-          <Field label="Navette">
+        <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette">
+          <Field label="Navette" labelMg="Fiara fitaterana">
             <select
               className={inputCls}
               value={form.navette}
@@ -539,7 +557,7 @@ function InscriptionForm() {
             </select>
           </Field>
           {form.navette === "Oui" && (
-            <Field label="Nombre de places navette">
+            <Field label="Nombre de places navette" labelMg="Isan'ny toerana">
               <input
                 type="number"
                 min={1}
@@ -557,7 +575,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 5. Paiement */}
-        <Section title="5. Paiement Mobile Money">
+        <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
           <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
             <div className="flex justify-between">
               <span>Inscription {form.course || "—"}</span>
@@ -583,16 +601,16 @@ function InscriptionForm() {
             </div>
           </div>
 
-          <Field label="Opérateur">
+          <Field label="Opérateur" labelMg="Mpandraharaha">
             <select
               className={inputCls}
               value={form.operateur}
               onChange={(e) => set("operateur", e.target.value)}
             >
-              <option value="">Choisir</option>
-              <option>MVola</option>
-              <option>Orange Money</option>
-              <option>Airtel Money</option>
+              <option value="">Choisir / Fidiana</option>
+              {(settings.pay_mvola_actif !== false) && <option>MVola</option>}
+              {(settings.pay_orange_actif !== false) && <option>Orange Money</option>}
+              {(settings.pay_airtel_actif !== false) && <option>Airtel Money</option>}
             </select>
           </Field>
 
@@ -624,7 +642,7 @@ function InscriptionForm() {
             </div>
           )}
 
-          <Field label="Référence de transaction">
+          <Field label="Référence de transaction" labelMg="Laharana transaction">
             <input
               className={inputCls}
               value={form.referencePaiement}
@@ -635,7 +653,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 6. Règlement */}
-        <Section title="6. Acceptation du règlement">
+        <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika">
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"
@@ -663,7 +681,7 @@ function InscriptionForm() {
           disabled={loading || !form.dateNaissance || !form.genre || !form.course}
           className="w-full bg-[#1F2C3F] text-white py-4 rounded-full font-semibold text-lg hover:bg-[#2a3d55] disabled:opacity-50"
         >
-          {loading ? "Enregistrement..." : "Valider mon inscription"}
+          {loading ? "Enregistrement..." : "Valider mon inscription / Hametraka ny fisoratana anarana"}
         </button>
       </form>
     </div>

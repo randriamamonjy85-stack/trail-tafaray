@@ -910,7 +910,7 @@ export default function AdminPage() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!(settings as any).notif_email_actif}
               onChange={(e) => setSettings({ ...settings, notif_email_actif: e.target.checked } as any)} />
-            E-mail automatique (nécessite RESEND_API_KEY sur Vercel)
+            E-mail automatique (Gmail SMTP ou Resend — variables Vercel)
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!(settings as any).notif_sms_actif}

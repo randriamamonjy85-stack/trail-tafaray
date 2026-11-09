@@ -66,6 +66,9 @@ const defaultSettings: Settings = {
   annee_reference_categories: 2026,
 };
 
+const inputCls =
+  "w-full border border-stone-300 rounded-lg px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F2C3F]/30 focus:border-[#1F2C3F]";
+
 function pricesFrom(s: Settings): Record<string, number> {
   return {
     "Zaza Tafaray": s.tarif_zaza,
@@ -77,7 +80,15 @@ function pricesFrom(s: Settings): Record<string, number> {
   };
 }
 
-function Section({ title, titleMg, children }: { title: string; titleMg?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  titleMg,
+  children,
+}: {
+  title: string;
+  titleMg?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
       <h2 className="text-lg font-semibold text-[#1F2C3F] border-b border-stone-100 pb-2">
@@ -106,16 +117,13 @@ function Field({
     <div>
       <label className="block text-sm font-medium text-stone-700 mb-1">
         <span>{label}</span>
-        {labelMg && (
-          <span className="text-stone-500 font-normal"> / {labelMg}</span>
-        )}
+        {labelMg && <span className="text-stone-500 font-normal"> / {labelMg}</span>}
         {required ? " *" : ""}
       </label>
       {children}
     </div>
   );
 }
-
 
 function InscriptionForm() {
   const searchParams = useSearchParams();
@@ -128,15 +136,10 @@ function InscriptionForm() {
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState("");
   const [categorieResult, setCategorieResult] = useState("");
-  const [summary, setSummary] = useState<{
-    nom: string;
-    prenom: string;
-    course: string;
-    categorie: string;
-    reference: string;
-    statut: string;
-  } | null>(null);
   const [dateError, setDateError] = useState("");
+  const [summaryCourse, setSummaryCourse] = useState("");
+  const [summaryNom, setSummaryNom] = useState("");
+  const [summaryPrenom, setSummaryPrenom] = useState("");
 
   const [form, setForm] = useState({
     prenom: "",
@@ -168,6 +171,8 @@ function InscriptionForm() {
           supabase.from("site_settings").select("*").eq("id", 1).single(),
           supabase.from("category_rules").select("*").eq("actif", true).order("ordre"),
         ]);
+        if (sRes.error) console.error("site_settings:", sRes.error);
+        if (rRes.error) console.error("category_rules:", rRes.error);
         if (sRes.data) setSettings({ ...defaultSettings, ...sRes.data });
         if (rRes.data) setRules(rRes.data as CategoryRule[]);
       } finally {
@@ -184,7 +189,6 @@ function InscriptionForm() {
 
   const showTee = form.course !== "" && form.course !== "Zaza Tafaray";
 
-  // Catégorie auto
   useEffect(() => {
     if (form.dateNaissance && form.genre && form.course && rules.length) {
       const cat = computeCategory(form.dateNaissance, form.genre, form.course, rules, {
@@ -237,7 +241,7 @@ function InscriptionForm() {
   };
 
   const onDatePicker = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value; // YYYY-MM-DD
+    const iso = e.target.value;
     if (!iso) return;
     const [y, m, d] = iso.split("-");
     const formatted = `${d}/${m}/${y}`;
@@ -284,14 +288,9 @@ function InscriptionForm() {
       const data = await res.json();
       if (data.success) {
         setReference(data.reference);
-        setSummary({
-          nom: form.nom,
-          prenom: form.prenom,
-          course: form.course,
-          categorie: data.categorie || categorieResult,
-          reference: data.reference,
-          statut: "En attente",
-        });
+        setSummaryNom(form.nom);
+        setSummaryPrenom(form.prenom);
+        setSummaryCourse(form.course);
         setSubmitted(true);
       } else {
         alert("Erreur : " + (data.error || "inconnue"));
@@ -318,48 +317,59 @@ function InscriptionForm() {
   }
 
   if (submitted) {
-    const s = summary || {
-      nom: form.nom,
-      prenom: form.prenom,
-      course: form.course,
-      categorie: categorieResult,
-      reference: reference,
-      statut: "En attente",
-    };
-    const qrData = encodeURIComponent(
+    const cat = categorieResult || "";
+    const qrPayload = encodeURIComponent(
       JSON.stringify({
-        ref: s.reference,
-        nom: s.nom,
-        prenom: s.prenom,
-        course: s.course,
-        categorie: s.categorie,
+        ref: reference,
+        nom: summaryNom,
+        prenom: summaryPrenom,
+        course: summaryCourse,
+        categorie: cat,
       })
     );
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrData}`;
+    const qrUrl =
+      "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + qrPayload;
+
     return (
       <div className="max-w-lg mx-auto px-4 py-12">
         <div className="bg-white rounded-2xl border border-stone-200 p-8 sm:p-10 text-center shadow-sm">
-          <p className="text-sm uppercase tracking-wide text-green-700 font-medium mb-2">
-            Inscription enregistrée / Voasoratra
-          </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#1F2C3F] mb-6">
-            Récapitulatif
+            Inscription enregistrée
           </h1>
           <div className="text-left space-y-2 text-stone-700 bg-stone-50 rounded-xl p-4 mb-6 text-sm sm:text-base">
-            <p><span className="text-stone-500">Nom :</span> <strong>{s.nom}</strong></p>
-            <p><span className="text-stone-500">Prénom :</span> <strong>{s.prenom}</strong></p>
-            <p><span className="text-stone-500">Course :</span> <strong>{s.course}</strong></p>
-            <p><span className="text-stone-500">Catégorie :</span> <strong>{s.categorie}</strong></p>
-            <p><span className="text-stone-500">Référence :</span> <strong className="font-mono text-[#A1532D]">{s.reference}</strong></p>
-            <p><span className="text-stone-500">Statut :</span> <strong className="text-amber-700">{s.statut}</strong></p>
+            <p>
+              <span className="text-stone-500">Nom :</span> <strong>{summaryNom}</strong>
+            </p>
+            <p>
+              <span className="text-stone-500">Prénom :</span> <strong>{summaryPrenom}</strong>
+            </p>
+            <p>
+              <span className="text-stone-500">Course :</span> <strong>{summaryCourse}</strong>
+            </p>
+            <p>
+              <span className="text-stone-500">Catégorie :</span> <strong>{cat}</strong>
+            </p>
+            <p>
+              <span className="text-stone-500">Référence :</span>{" "}
+              <strong className="font-mono text-[#A1532D]">{reference}</strong>
+            </p>
+            <p>
+              <span className="text-stone-500">Statut :</span>{" "}
+              <strong className="text-amber-700">En attente</strong>
+            </p>
           </div>
           <p className="text-sm text-stone-600 mb-3">QR code unique de votre inscription</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrUrl} alt={`QR ${s.reference}`} className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2" />
-          <p className="text-xs text-stone-500 mt-4">
-            Conservez cette page ou une capture d&apos;écran. L&apos;administrateur vérifiera le paiement Mobile Money.
+          <img
+            src={qrUrl}
+            alt={"QR " + reference}
+            className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2"
+          />
+          <p className="text-sm text-stone-500 mt-4">
+            L&apos;administrateur vérifiera votre paiement Mobile Money et validera manuellement
+            l&apos;inscription.
           </p>
-          <p className="text-xs text-stone-500 mt-2">
+          <p className="text-xs text-stone-500 mt-3">
             Au retrait des dossards : CIN / fiche médicale et autorisation parentale (si concerné).
           </p>
         </div>
@@ -371,11 +381,11 @@ function InscriptionForm() {
     <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
       <p className="text-stone-600 mb-8">
-        Remplissez le formulaire en une seule page / Fenoy ity taratasy ity. Les champs * sont obligatoires / Tsy maintsy fenoina ny misy *.
+        Remplissez le formulaire en une seule page / Fenoy ity taratasy ity. Les champs * sont
+        obligatoires / Tsy maintsy fenoina ny misy *.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 1. Personnelles */}
         <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom" labelMg="Anarana" required>
@@ -407,7 +417,10 @@ function InscriptionForm() {
                 maxLength={10}
                 required
               />
-              <label className="shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
+              <label
+                className="relative shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50"
+                title="Calendrier"
+              >
                 <span className="sr-only">Calendrier</span>
                 <input
                   type="date"
@@ -474,7 +487,11 @@ function InscriptionForm() {
             />
           </Field>
 
-          <Field label="Numéro d'identité ou passeport" labelMg="Laharana karapanondro / pasipaoro" required>
+          <Field
+            label="Numéro d'identité ou passeport"
+            labelMg="Laharana karapanondro / pasipaoro"
+            required
+          >
             <input
               className={inputCls}
               value={form.numeroIdentite}
@@ -484,7 +501,6 @@ function InscriptionForm() {
           </Field>
         </Section>
 
-        {/* 2. Sportives */}
         <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena">
           <Field label="Course" labelMg="Lalao / hazakazaka" required>
             {courseParam && form.course === courseParam ? (
@@ -561,7 +577,6 @@ function InscriptionForm() {
           )}
         </Section>
 
-        {/* 3. Urgence */}
         <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom du contact" labelMg="Anaran'ny ifandraisana maika">
@@ -581,7 +596,6 @@ function InscriptionForm() {
           </div>
         </Section>
 
-        {/* 4. Navette */}
         <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette">
           <Field label="Navette" labelMg="Fiara fitaterana">
             <select
@@ -611,7 +625,6 @@ function InscriptionForm() {
           </p>
         </Section>
 
-        {/* 5. Paiement */}
         <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
           <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
             <div className="flex justify-between">
@@ -620,9 +633,7 @@ function InscriptionForm() {
             </div>
             {form.navette === "Oui" && (
               <div className="flex justify-between">
-                <span>
-                  Navette × {totals.places}
-                </span>
+                <span>Navette × {totals.places}</span>
                 <span>{totals.navette.toLocaleString("fr-MG")} Ar</span>
               </div>
             )}
@@ -645,16 +656,17 @@ function InscriptionForm() {
               onChange={(e) => set("operateur", e.target.value)}
             >
               <option value="">Choisir / Fidiana</option>
-              {(settings.pay_mvola_actif !== false) && <option>MVola</option>}
-              {(settings.pay_orange_actif !== false) && <option>Orange Money</option>}
-              {(settings.pay_airtel_actif !== false) && <option>Airtel Money</option>}
+              {settings.pay_mvola_actif !== false && <option>MVola</option>}
+              {settings.pay_orange_actif !== false && <option>Orange Money</option>}
+              {settings.pay_airtel_actif !== false && <option>Airtel Money</option>}
             </select>
           </Field>
 
           {form.operateur && (
             <div className="bg-[#1F2C3F]/5 border border-stone-200 rounded-xl p-4 text-sm space-y-1">
               <p>
-                <strong>Bénéficiaire :</strong> {settings.mm_beneficiaire || "Association Trail Tafaray"}
+                <strong>Bénéficiaire :</strong>{" "}
+                {settings.mm_beneficiaire || "Association Trail Tafaray"}
               </p>
               {settings.mm_titulaire && (
                 <p>
@@ -670,8 +682,7 @@ function InscriptionForm() {
                 </p>
               )}
               <p>
-                <strong>Montant à transférer :</strong>{" "}
-                {totals.total.toLocaleString("fr-MG")} Ar
+                <strong>Montant à transférer :</strong> {totals.total.toLocaleString("fr-MG")} Ar
               </p>
               {settings.mm_instructions && (
                 <p className="text-stone-600 mt-2">{settings.mm_instructions}</p>
@@ -689,7 +700,6 @@ function InscriptionForm() {
           </Field>
         </Section>
 
-        {/* 6. Règlement */}
         <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika">
           <label className="flex items-start gap-3 text-sm">
             <input
@@ -713,22 +723,26 @@ function InscriptionForm() {
           </label>
         </Section>
 
-
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-950">
           <p className="font-semibold mb-1">Important — Retrait des dossards</p>
           <p>
-            CIN / FICHE MÉDICALE et AUTORISATION PARENTALE doivent être présentés lors du retrait des dossards.
+            CIN / FICHE MÉDICALE et AUTORISATION PARENTALE doivent être présentés lors du retrait
+            des dossards.
           </p>
           <p className="mt-1 text-amber-900/80">
-            Ny CIN / taratasy ara-pahasalamana ary ny fanomezan-dàlana ray aman-dreny dia tsy maintsy aseho amin&apos;ny fisintahana dossard.
+            Ny CIN / taratasy ara-pahasalamana ary ny fanomezan-dàlana ray aman-dreny dia tsy maintsy
+            aseho amin&apos;ny fisintahana dossard.
           </p>
         </div>
+
         <button
           type="submit"
           disabled={loading || !form.dateNaissance || !form.genre || !form.course}
           className="w-full bg-[#1F2C3F] text-white py-4 rounded-full font-semibold text-lg hover:bg-[#2a3d55] disabled:opacity-50"
         >
-          {loading ? "Enregistrement..." : "Valider mon inscription / Hametraka ny fisoratana anarana"}
+          {loading
+            ? "Enregistrement..."
+            : "Valider mon inscription / Hametraka ny fisoratana anarana"}
         </button>
       </form>
     </div>

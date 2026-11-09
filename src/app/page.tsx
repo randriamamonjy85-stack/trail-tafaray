@@ -3,6 +3,7 @@ import Image from "next/image";
 import Countdown from "@/components/Countdown";
 import { getSettings, getTarifs } from "@/lib/settings";
 import { createClient } from "@/lib/supabase/server";
+import PartnersShowcase from "@/components/PartnersShowcase";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +14,6 @@ const FALLBACK_COURSES = [
   { nom: "Trail Intense", slug: "trail-intense", distance: "35 KM", type_epreuve: "RUN", tarif: 45000, image_url: "" },
   { nom: "VTT BEKA", slug: "vtt-beka", distance: "31 KM", type_epreuve: "BIKE", tarif: 40000, image_url: "" },
   { nom: "Duathlon Nature", slug: "duathlon-nature", distance: "24 KM", type_epreuve: "RUN · BIKE", tarif: 50000, image_url: "" },
-];
-
-const PARTNER_GROUPS: { keys: string[]; title: string }[] = [
-  { keys: ["sponsor_officiel"], title: "Sponsors officiels" },
-  { keys: ["sponsor_principal"], title: "Sponsors principaux" },
-  { keys: ["partenaire_officiel", "officiel"], title: "Partenaires officiels" },
-  { keys: ["institutionnel"], title: "Partenaires institutionnels" },
-  { keys: ["technique"], title: "Partenaires techniques" },
-  { keys: ["logistique"], title: "Partenaires logistiques" },
-  { keys: ["media"], title: "Partenaires médias" },
-  { keys: ["autre"], title: "Autres partenaires" },
 ];
 
 export default async function Home() {
@@ -81,16 +71,7 @@ export default async function Home() {
   const emailPart = (settings as any).email_partenariat || "trailtafaray@gmail.com";
   const mailto = `mailto:${emailPart}?subject=${encodeURIComponent("Demande de partenariat – Association Trail Tafaray")}`;
 
-  const used = new Set<string>();
-  const partnerSections = PARTNER_GROUPS.map((g) => {
-    const items = partenaires.filter((p) => g.keys.includes(p.type));
-    items.forEach((p) => used.add(p.id));
-    return { title: g.title, items };
-  }).filter((s) => s.items.length > 0);
-  const rest = partenaires.filter((p) => !used.has(p.id));
-  if (rest.length) partnerSections.push({ title: "Partenaires", items: rest });
-
-  return (
+    return (
     <div className="overflow-x-hidden">
       {/* HERO */}
       <section className="relative min-h-[85vh] flex items-center justify-center bg-[#1F2C3F] text-white overflow-hidden">
@@ -264,87 +245,28 @@ export default async function Home() {
         </section>
       )}
 
-      {/* PARTENAIRES / SPONSORS hiérarchisés */}
-      {settings.partenaires_visibles && partnerSections.length > 0 && (
-        <section className="py-16 sm:py-20 bg-stone-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
-              <p className="text-[#A1532D] text-xs tracking-widest uppercase font-semibold mb-2">
+      {settings.partenaires_visibles && partenaires.length > 0 && (
+        <section className="py-16 sm:py-20 bg-[#F7F4EF]">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-14">
+              <p className="text-[#A1532D] text-xs tracking-[0.2em] uppercase font-semibold mb-3">
                 Ils nous soutiennent
               </p>
-              <h2 className="text-2xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">
-                Sponsors & partenaires
+              <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-3">
+                Nos partenaires
               </h2>
-              <Link href="/partenaires" className="text-sm text-[#A1532D] hover:underline">
+              <p className="text-stone-600 text-sm sm:text-base max-w-xl mx-auto">
+                Merci aux organisations qui rendent le Trail Tafaray possible, du départ jusqu&apos;à la ligne d&apos;arrivée.
+              </p>
+              <Link href="/partenaires" className="inline-block mt-4 text-sm text-[#A1532D] hover:underline">
                 Voir tous les partenaires →
               </Link>
             </div>
-
-            <div className="space-y-12">
-              {partnerSections.map((section) => {
-                const n = section.items.length;
-                const gridCls =
-                  n === 1
-                    ? "grid grid-cols-1 max-w-xs mx-auto"
-                    : n === 2
-                    ? "grid grid-cols-2 max-w-lg mx-auto gap-4"
-                    : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 justify-items-center";
-                return (
-                  <div key={section.title}>
-                    <h3 className="text-center text-sm font-semibold tracking-wide text-[#1F2C3F] uppercase mb-5">
-                      {section.title}
-                    </h3>
-                    <div className={gridCls}>
-                      {section.items.map((p: any) => {
-                        const card = (
-                          <div className="bg-white rounded-2xl border border-stone-200 p-5 flex flex-col items-center justify-center min-h-[7rem] w-full hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
-                            {p.logo_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={p.logo_url}
-                                alt={p.nom}
-                                className="max-h-14 object-contain"
-                              />
-                            ) : (
-                              <span className="text-sm font-medium text-center text-[#1F2C3F]">
-                                {p.nom}
-                              </span>
-                            )}
-                          </div>
-                        );
-                        return p.site_url ? (
-                          <a
-                            key={p.id}
-                            href={p.site_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full"
-                          >
-                            {card}
-                          </a>
-                        ) : (
-                          <div key={p.id} className="w-full">
-                            {card}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-14 bg-[#1F2C3F] text-white rounded-3xl p-8 sm:p-10 text-center shadow-lg">
-              <h3 className="text-xl sm:text-2xl font-bold mb-3">
-                Devenez partenaire de Trail Tafaray
-              </h3>
-              <p className="text-stone-300 text-sm max-w-xl mx-auto mb-6">
-                {(settings as any).texte_partenaires_cta ||
-                  "Soutenez nos événements et associez votre image à Trail Tafaray."}
-              </p>
+            <PartnersShowcase partenaires={partenaires} variant="home" />
+            <div className="mt-16 text-center">
               <a
                 href={mailto}
-                className="inline-block bg-[#A1532D] px-7 py-3 rounded-full font-semibold text-sm hover:bg-[#8a4526] transition"
+                className="inline-block bg-[#1F2C3F] text-white px-8 py-3 rounded-full font-semibold text-sm hover:bg-[#2a3d55] transition"
               >
                 Devenir partenaire
               </a>

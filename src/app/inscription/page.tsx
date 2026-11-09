@@ -317,14 +317,22 @@ function InscriptionForm() {
     );
   }
 
-    if (submitted && summary) {
+  if (submitted) {
+    const s = summary || {
+      nom: form.nom,
+      prenom: form.prenom,
+      course: form.course,
+      categorie: categorieResult,
+      reference: reference,
+      statut: "En attente",
+    };
     const qrData = encodeURIComponent(
       JSON.stringify({
-        ref: summary.reference,
-        nom: summary.nom,
-        prenom: summary.prenom,
-        course: summary.course,
-        categorie: summary.categorie,
+        ref: s.reference,
+        nom: s.nom,
+        prenom: s.prenom,
+        course: s.course,
+        categorie: s.categorie,
       })
     );
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrData}`;
@@ -338,16 +346,16 @@ function InscriptionForm() {
             Récapitulatif
           </h1>
           <div className="text-left space-y-2 text-stone-700 bg-stone-50 rounded-xl p-4 mb-6 text-sm sm:text-base">
-            <p><span className="text-stone-500">Nom :</span> <strong>{summary.nom}</strong></p>
-            <p><span className="text-stone-500">Prénom :</span> <strong>{summary.prenom}</strong></p>
-            <p><span className="text-stone-500">Course :</span> <strong>{summary.course}</strong></p>
-            <p><span className="text-stone-500">Catégorie :</span> <strong>{summary.categorie}</strong></p>
-            <p><span className="text-stone-500">Référence :</span> <strong className="font-mono text-[#A1532D]">{summary.reference}</strong></p>
-            <p><span className="text-stone-500">Statut :</span> <strong className="text-amber-700">{summary.statut}</strong></p>
+            <p><span className="text-stone-500">Nom :</span> <strong>{s.nom}</strong></p>
+            <p><span className="text-stone-500">Prénom :</span> <strong>{s.prenom}</strong></p>
+            <p><span className="text-stone-500">Course :</span> <strong>{s.course}</strong></p>
+            <p><span className="text-stone-500">Catégorie :</span> <strong>{s.categorie}</strong></p>
+            <p><span className="text-stone-500">Référence :</span> <strong className="font-mono text-[#A1532D]">{s.reference}</strong></p>
+            <p><span className="text-stone-500">Statut :</span> <strong className="text-amber-700">{s.statut}</strong></p>
           </div>
           <p className="text-sm text-stone-600 mb-3">QR code unique de votre inscription</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrUrl} alt={`QR ${summary.reference}`} className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2" />
+          <img src={qrUrl} alt={`QR ${s.reference}`} className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2" />
           <p className="text-xs text-stone-500 mt-4">
             Conservez cette page ou une capture d&apos;écran. L&apos;administrateur vérifiera le paiement Mobile Money.
           </p>
@@ -368,7 +376,7 @@ function InscriptionForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 1. Personnelles */}
-        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana" titleMg="1. Mombamomba manokana">
+        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom" labelMg="Anarana" required>
               <input
@@ -477,7 +485,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 2. Sportives */}
-        <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena" titleMg="2. Mombamomba ara-panatanjahan-tena">
+        <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena">
           <Field label="Course" labelMg="Lalao / hazakazaka" required>
             {courseParam && form.course === courseParam ? (
               <div className="space-y-2">
@@ -554,7 +562,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 3. Urgence */}
-        <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika" titleMg="3. Fifandraisana maika">
+        <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom du contact" labelMg="Anaran'ny ifandraisana maika">
               <input
@@ -574,7 +582,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 4. Navette */}
-        <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette" titleMg="4. Fitaterana sy navette">
+        <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette">
           <Field label="Navette" labelMg="Fiara fitaterana">
             <select
               className={inputCls}
@@ -604,7 +612,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 5. Paiement */}
-        <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
+        <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
           <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
             <div className="flex justify-between">
               <span>Inscription {form.course || "—"}</span>
@@ -682,7 +690,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 6. Règlement */}
-        <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika" titleMg="6. Fanekena ny fitsipika">
+        <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika">
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"

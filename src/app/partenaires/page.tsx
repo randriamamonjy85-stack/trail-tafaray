@@ -158,8 +158,13 @@ export default async function PartenairesPage() {
         {groups.map((g, idx) => {
           const size: "xl" | "lg" | "md" =
             idx === 0 ? "xl" : idx <= 2 ? "lg" : "md";
+          const n = g.items.length;
           const cols =
-            size === "xl"
+            n === 1
+              ? "grid-cols-1 max-w-md mx-auto"
+              : n === 2
+              ? "grid-cols-1 sm:grid-cols-2 max-w-3xl mx-auto"
+              : size === "xl"
               ? "grid-cols-1 md:grid-cols-2"
               : size === "lg"
               ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
@@ -172,7 +177,7 @@ export default async function PartenairesPage() {
                 <div className="w-16 h-1 bg-[#A1532D] mx-auto mt-3 mb-3 rounded-full" />
                 <p className="text-stone-500 text-sm">{g.subtitle}</p>
               </div>
-              <div className={`grid ${cols} gap-6`}>
+              <div className={`grid ${cols} gap-6 justify-items-center`}>
                 {g.items.map((p: any) => (
                   <PartnerCard key={p.id} p={p} size={size} />
                 ))}

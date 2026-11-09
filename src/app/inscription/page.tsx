@@ -66,9 +66,6 @@ const defaultSettings: Settings = {
   annee_reference_categories: 2026,
 };
 
-const inputCls =
-  "w-full border border-stone-300 rounded-lg px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F2C3F]/30 focus:border-[#1F2C3F]";
-
 function pricesFrom(s: Settings): Record<string, number> {
   return {
     "Zaza Tafaray": s.tarif_zaza,
@@ -131,6 +128,14 @@ function InscriptionForm() {
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState("");
   const [categorieResult, setCategorieResult] = useState("");
+  const [summary, setSummary] = useState<{
+    nom: string;
+    prenom: string;
+    course: string;
+    categorie: string;
+    reference: string;
+    statut: string;
+  } | null>(null);
   const [dateError, setDateError] = useState("");
 
   const [form, setForm] = useState({
@@ -163,8 +168,6 @@ function InscriptionForm() {
           supabase.from("site_settings").select("*").eq("id", 1).single(),
           supabase.from("category_rules").select("*").eq("actif", true).order("ordre"),
         ]);
-        if (sRes.error) console.error("site_settings:", sRes.error);
-        if (rRes.error) console.error("category_rules:", rRes.error);
         if (sRes.data) setSettings({ ...defaultSettings, ...sRes.data });
         if (rRes.data) setRules(rRes.data as CategoryRule[]);
       } finally {
@@ -281,6 +284,14 @@ function InscriptionForm() {
       const data = await res.json();
       if (data.success) {
         setReference(data.reference);
+        setSummary({
+          nom: form.nom,
+          prenom: form.prenom,
+          course: form.course,
+          categorie: data.categorie || categorieResult,
+          reference: data.reference,
+          statut: "En attente",
+        });
         setSubmitted(true);
       } else {
         alert("Erreur : " + (data.error || "inconnue"));
@@ -306,24 +317,42 @@ function InscriptionForm() {
     );
   }
 
-  if (submitted) {
+    if (submitted && summary) {
+    const qrData = encodeURIComponent(
+      JSON.stringify({
+        ref: summary.reference,
+        nom: summary.nom,
+        prenom: summary.prenom,
+        course: summary.course,
+        categorie: summary.categorie,
+      })
+    );
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrData}`;
     return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <div className="bg-white rounded-2xl border border-stone-200 p-12">
-          <h1 className="text-3xl font-bold text-[#1F2C3F] mb-4">Inscription enregistrée</h1>
-          <p className="text-lg text-stone-700 mb-2">Votre référence :</p>
-          <p className="text-2xl font-mono font-bold text-[#A1532D] mb-4">{reference}</p>
-          {categorieResult && (
-            <p className="text-stone-600 mb-2">
-              Catégorie : <strong>{categorieResult}</strong>
-            </p>
-          )}
-          <p className="text-stone-600">
-            Statut : <strong>En attente</strong>
+      <div className="max-w-lg mx-auto px-4 py-12">
+        <div className="bg-white rounded-2xl border border-stone-200 p-8 sm:p-10 text-center shadow-sm">
+          <p className="text-sm uppercase tracking-wide text-green-700 font-medium mb-2">
+            Inscription enregistrée / Voasoratra
           </p>
-          <p className="text-sm text-stone-500 mt-4">
-            L&apos;administrateur vérifiera votre paiement Mobile Money et validera manuellement
-            l&apos;inscription.
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1F2C3F] mb-6">
+            Récapitulatif
+          </h1>
+          <div className="text-left space-y-2 text-stone-700 bg-stone-50 rounded-xl p-4 mb-6 text-sm sm:text-base">
+            <p><span className="text-stone-500">Nom :</span> <strong>{summary.nom}</strong></p>
+            <p><span className="text-stone-500">Prénom :</span> <strong>{summary.prenom}</strong></p>
+            <p><span className="text-stone-500">Course :</span> <strong>{summary.course}</strong></p>
+            <p><span className="text-stone-500">Catégorie :</span> <strong>{summary.categorie}</strong></p>
+            <p><span className="text-stone-500">Référence :</span> <strong className="font-mono text-[#A1532D]">{summary.reference}</strong></p>
+            <p><span className="text-stone-500">Statut :</span> <strong className="text-amber-700">{summary.statut}</strong></p>
+          </div>
+          <p className="text-sm text-stone-600 mb-3">QR code unique de votre inscription</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrUrl} alt={`QR ${summary.reference}`} className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2" />
+          <p className="text-xs text-stone-500 mt-4">
+            Conservez cette page ou une capture d&apos;écran. L&apos;administrateur vérifiera le paiement Mobile Money.
+          </p>
+          <p className="text-xs text-stone-500 mt-2">
+            Au retrait des dossards : CIN / fiche médicale et autorisation parentale (si concerné).
           </p>
         </div>
       </div>
@@ -339,7 +368,7 @@ function InscriptionForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 1. Personnelles */}
-        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana">
+        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana" titleMg="1. Mombamomba manokana">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom" labelMg="Anarana" required>
               <input
@@ -370,7 +399,7 @@ function InscriptionForm() {
                 maxLength={10}
                 required
               />
-              <label className="relative shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
+              <label className="shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50" title="Calendrier">
                 <span className="sr-only">Calendrier</span>
                 <input
                   type="date"
@@ -448,7 +477,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 2. Sportives */}
-        <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena">
+        <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena" titleMg="2. Mombamomba ara-panatanjahan-tena">
           <Field label="Course" labelMg="Lalao / hazakazaka" required>
             {courseParam && form.course === courseParam ? (
               <div className="space-y-2">
@@ -525,7 +554,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 3. Urgence */}
-        <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika">
+        <Section title="3. Contact d'urgence" titleMg="3. Fifandraisana maika" titleMg="3. Fifandraisana maika">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom du contact" labelMg="Anaran'ny ifandraisana maika">
               <input
@@ -545,7 +574,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 4. Navette */}
-        <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette">
+        <Section title="4. Transport et navette" titleMg="4. Fitaterana sy navette" titleMg="4. Fitaterana sy navette">
           <Field label="Navette" labelMg="Fiara fitaterana">
             <select
               className={inputCls}
@@ -575,7 +604,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 5. Paiement */}
-        <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
+        <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
           <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
             <div className="flex justify-between">
               <span>Inscription {form.course || "—"}</span>
@@ -653,7 +682,7 @@ function InscriptionForm() {
         </Section>
 
         {/* 6. Règlement */}
-        <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika">
+        <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika" titleMg="6. Fanekena ny fitsipika">
           <label className="flex items-start gap-3 text-sm">
             <input
               type="checkbox"
@@ -676,6 +705,16 @@ function InscriptionForm() {
           </label>
         </Section>
 
+
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-950">
+          <p className="font-semibold mb-1">Important — Retrait des dossards</p>
+          <p>
+            CIN / FICHE MÉDICALE et AUTORISATION PARENTALE doivent être présentés lors du retrait des dossards.
+          </p>
+          <p className="mt-1 text-amber-900/80">
+            Ny CIN / taratasy ara-pahasalamana ary ny fanomezan-dàlana ray aman-dreny dia tsy maintsy aseho amin&apos;ny fisintahana dossard.
+          </p>
+        </div>
         <button
           type="submit"
           disabled={loading || !form.dateNaissance || !form.genre || !form.course}

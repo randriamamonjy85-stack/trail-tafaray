@@ -41,27 +41,77 @@ export async function POST(request: Request) {
       .eq("id", 1)
       .single();
 
-    const tpl =
-      settings?.notif_message_valide ||
-      "Bonjour {prenom}, votre inscription {reference} ({course}) est validée. Misaotra — Trail Tafaray.";
+    const qrPayload = encodeURIComponent(
+      JSON.stringify({
+        ref: row.reference,
+        nom: row.nom,
+        prenom: row.prenom,
+        course: row.course,
+        categorie: row.categorie,
+        statut: "Validé",
+      })
+    );
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrPayload}`;
+
+    const defaultTpl =
+      "INSCRIPTION VALIDÉE\n\n" +
+      "Nom : {nom}\nPrénom : {prenom}\nCourse : {course}\nCatégorie : {categorie}\n" +
+      "Référence : {reference}\nStatut : Validé\n\n" +
+      "QR code : {qr}\n\nMisaotra / Merci — Trail Tafaray.";
+
+    const tpl = settings?.notif_message_valide || defaultTpl;
     const message = fillTemplate(tpl, {
       prenom: row.prenom || "",
       nom: row.nom || "",
       reference: row.reference || "",
       course: row.course || "",
+      categorie: row.categorie || "",
+      qr: qrUrl,
     });
+
+    // Prefer structured message if template has no placeholders for details
+    const fullText =
+      `INSCRIPTION VALIDÉE\n\n` +
+      `Nom : ${row.nom || ""}\n` +
+      `Prénom : ${row.prenom || ""}\n` +
+      `Course : ${row.course || ""}\n` +
+      `Catégorie : ${row.categorie || ""}\n` +
+      `Référence : ${row.reference || ""}\n` +
+      `Statut : Validé\n\n` +
+      `QR code de votre inscription :\n${qrUrl}\n\n` +
+      (settings?.notif_message_valide
+        ? `\n---\n${fillTemplate(settings.notif_message_valide, {
+            prenom: row.prenom || "",
+            nom: row.nom || "",
+            reference: row.reference || "",
+            course: row.course || "",
+            categorie: row.categorie || "",
+            qr: qrUrl,
+          })}\n`
+        : "") +
+      `\nMisaotra / Merci — Trail Tafaray.`;
 
     if (settings?.notif_email_actif && row.email) {
       const r = await sendValidationEmail({
         to: row.email,
         subject: `Inscription validée — ${row.reference}`,
-        text: message,
+        text: fullText,
       });
       notifs.email = r.ok ? "envoyé" : r.reason;
     }
 
     if (settings?.notif_sms_actif && row.telephone) {
-      const r = await sendValidationSms({ to: String(row.telephone), body: message });
+      const smsBody = fillTemplate(
+        "Inscription VALIDEE {reference} — {prenom} {nom} — {course} — {categorie}. Trail Tafaray.",
+        {
+          prenom: row.prenom || "",
+          nom: row.nom || "",
+          reference: row.reference || "",
+          course: row.course || "",
+          categorie: row.categorie || "",
+        }
+      );
+      const r = await sendValidationSms({ to: String(row.telephone), body: smsBody });
       notifs.sms = r.ok ? "envoyé" : r.reason;
     }
   }

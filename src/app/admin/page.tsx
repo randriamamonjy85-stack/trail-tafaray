@@ -105,6 +105,8 @@ export default function AdminPage() {
   const [inscriptions, setInscriptions] = useState<Inscription[]>([]);
   const [filterStatut, setFilterStatut] = useState("Tous");
   const [filterCourse, setFilterCourse] = useState("Toutes");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortAlpha, setSortAlpha] = useState(false);
   const [settings, setSettings] = useState<Settings>(emptySettings);
   const [partenaires, setPartenaires] = useState<any[]>([]);
   const [actualites, setActualites] = useState<any[]>([]);
@@ -355,11 +357,33 @@ export default function AdminPage() {
     }
   };
 
-  const filtered = inscriptions.filter((i) => {
-    if (filterStatut !== "Tous" && i.statut !== filterStatut) return false;
-    if (filterCourse !== "Toutes" && i.course !== filterCourse) return false;
-    return true;
-  });
+    const filtered = inscriptions
+    .filter((i) => {
+      if (filterStatut !== "Tous" && i.statut !== filterStatut) return false;
+      if (filterCourse !== "Toutes" && i.course !== filterCourse) return false;
+      const q = searchQuery.trim().toLowerCase();
+      if (q) {
+        const hay = [
+          i.nom,
+          i.prenom,
+          i.reference,
+          i.telephone,
+          i.email,
+          i.course,
+        ]
+          .map((x) => String(x || "").toLowerCase())
+          .join(" ");
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    })
+    .slice()
+    .sort((a, b) => {
+      if (!sortAlpha) return 0;
+      const an = `${a.nom || ""} ${a.prenom || ""}`.toLowerCase();
+      const bn = `${b.nom || ""} ${b.prenom || ""}`.toLowerCase();
+      return an.localeCompare(bn, "fr");
+    });
 
   if (loading) return <div className="p-20 text-center">Chargement...</div>;
 
@@ -496,6 +520,21 @@ export default function AdminPage() {
                 <option key={c}>{c}</option>
               ))}
             </select>
+            <input
+              type="search"
+              placeholder="Nom, référence, téléphone…"
+              className="border border-stone-300 rounded-lg px-3 py-2 text-sm min-w-[200px] flex-1 max-w-xs"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <label className="flex items-center gap-2 text-sm text-stone-600">
+              <input
+                type="checkbox"
+                checked={sortAlpha}
+                onChange={(e) => setSortAlpha(e.target.checked)}
+              />
+              A → Z
+            </label>
             <span className="text-sm text-stone-500">{filtered.length} inscription(s)</span>
             <div className="ml-auto flex gap-2">
               <a

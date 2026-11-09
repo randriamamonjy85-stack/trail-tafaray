@@ -386,7 +386,7 @@ function InscriptionForm() {
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Section title="1. Informations personnelles" titleMg="1. Mombamomba manokana">
+        <Section title="1. Informations personnelles" titleMg="1. Mombamombanao">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom" labelMg="Anarana" required>
               <input
@@ -730,8 +730,8 @@ function InscriptionForm() {
             des dossards.
           </p>
           <p className="mt-1 text-amber-900/80">
-            Ny CIN / taratasy ara-pahasalamana ary ny fanomezan-dàlana ray aman-dreny dia tsy maintsy
-            aseho amin&apos;ny fisintahana dossard.
+            Ny CIN / taratasy ara-pahasalamana ary ny fanomezan-dàlana avy amin&apos;ny ray aman-dreny dia tsy maintsy
+            aseho rehefa maka ny dossard.
           </p>
         </div>
 

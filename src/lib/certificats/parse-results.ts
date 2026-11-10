@@ -1,7 +1,6 @@
 import * as XLSX from "xlsx";
 import {
   ALLOWED_STATUTS,
-  FORBIDDEN_HEADER_HINTS,
   REQUIRED_HEADERS,
   isForbiddenHeader,
   isValidTemps,
@@ -72,14 +71,6 @@ function parseCsv(text: string): string[][] {
     rows.push(row);
   }
   return rows.filter((r) => r.some((c) => c.trim() !== ""));
-}
-
-function mapHeaders(header: string[]): Record<string, number> {
-  const map: Record<string, number> = {};
-  header.forEach((h, i) => {
-    map[h.trim()] = i;
-  });
-  return map;
 }
 
 function headerMatches(actual: string[], required: readonly string[]): boolean {

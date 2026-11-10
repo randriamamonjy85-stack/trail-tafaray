@@ -1,47 +1,38 @@
 import JSZip from "jszip";
+import {
+  validateTemplateSettings,
+  type FontWeight,
+  type TemplateSettings,
+} from "./validate-settings";
 
 const MAX_ZIP_BYTES = 25 * 1024 * 1024;
 const MAX_BG_BYTES = 12 * 1024 * 1024;
-const MAX_FONT_BYTES = 5 * 1024 * 1024;
+const MAX_FONT_BYTES = 8 * 1024 * 1024;
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
 
-const ALLOWED_EXT = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "json",
-  "ttf",
-  "otf",
-  "pdf",
-]);
+const ALLOWED_EXT = new Set(["png", "jpg", "jpeg", "json", "ttf", "otf", "pdf"]);
 
-export type FieldSettings = {
-  id: string; // nom_complet | course | temps | classement | edition
-  x_mm: number;
-  y_mm: number;
-  fontSize_pt: number;
-  fontFamily: string;
-  fontWeight?: "normal" | "bold";
-  color?: string; // #RRGGBB
-  align?: "left" | "center" | "right";
-  letterSpacing?: number;
-  maxWidth_mm?: number;
-  autoShrink?: boolean;
-};
+export type {
+  FieldSettings,
+  FontMapEntry,
+  FontWeight,
+  TemplateSettings,
+} from "./validate-settings";
 
-export type TemplateSettings = {
-  page_width_mm: number;
-  page_height_mm: number;
-  fields: FieldSettings[];
-  fonts?: { family: string; file: string }[];
+export type ParsedFont = {
+  family: string;
+  file: string;
+  bytes: Uint8Array;
+  weight: FontWeight;
 };
 
 export type ParsedTmhPackage = {
   ok: boolean;
   errors: string[];
+  warnings: string[];
   background?: { name: string; bytes: Uint8Array; mime: string };
   settings?: TemplateSettings;
-  fonts: { family: string; file: string; bytes: Uint8Array }[];
+  fonts: ParsedFont[];
   referencePdf?: { name: string; bytes: Uint8Array };
 };
 
@@ -57,54 +48,57 @@ function baseName(path: string): string {
 
 export async function parseTmhPackage(buf: ArrayBuffer): Promise<ParsedTmhPackage> {
   const errors: string[] = [];
+  const warnings: string[] = [];
   if (buf.byteLength > MAX_ZIP_BYTES) {
-    return { ok: false, errors: ["Paquet ZIP trop volumineux (max 25 Mo)."], fonts: [] };
+    return {
+      ok: false,
+      errors: ["Paquet ZIP trop volumineux (max 25 Mo)."],
+      warnings,
+      fonts: [],
+    };
   }
 
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(buf);
   } catch {
-    return { ok: false, errors: ["ZIP illisible."], fonts: [] };
+    return { ok: false, errors: ["ZIP illisible."], warnings, fonts: [] };
   }
 
   const files: { path: string; data: Uint8Array }[] = [];
-  const names = Object.keys(zip.files);
-  for (const path of names) {
+  for (const path of Object.keys(zip.files)) {
     const f = zip.files[path];
     if (f.dir) continue;
     const e = ext(path);
     if (!ALLOWED_EXT.has(e)) {
-      errors.push(`Fichier interdit dans le paquet : ${path}`);
-      continue;
-    }
-    // refuse executables disguised
-    if (/\.(exe|sh|bat|js|mjs|cjs|html|htm|svg)$/i.test(path)) {
-      errors.push(`Type interdit : ${path}`);
+      errors.push(`Fichier interdit dans le paquet : ${baseName(path)}`);
       continue;
     }
     const data = new Uint8Array(await f.async("arraybuffer"));
     files.push({ path, data });
   }
-
-  if (errors.length) return { ok: false, errors, fonts: [] };
+  if (errors.length) return { ok: false, errors, warnings, fonts: [] };
 
   let background: ParsedTmhPackage["background"];
-  let settings: TemplateSettings | undefined;
+  let settingsRaw: unknown;
   let referencePdf: ParsedTmhPackage["referencePdf"];
   const fontFiles: { path: string; data: Uint8Array }[] = [];
+  let jsonCount = 0;
+  let imageCount = 0;
+  let pdfCount = 0;
 
   for (const f of files) {
     const e = ext(f.path);
     const bn = baseName(f.path);
     if (e === "json") {
+      jsonCount += 1;
       try {
-        const text = new TextDecoder("utf-8").decode(f.data);
-        settings = JSON.parse(text) as TemplateSettings;
+        settingsRaw = JSON.parse(new TextDecoder("utf-8").decode(f.data));
       } catch {
         errors.push(`JSON de réglages invalide : ${bn}`);
       }
     } else if (e === "png" || e === "jpg" || e === "jpeg") {
+      imageCount += 1;
       if (f.data.byteLength > MAX_BG_BYTES) {
         errors.push(`Image trop grande : ${bn}`);
       } else if (!background) {
@@ -118,56 +112,55 @@ export async function parseTmhPackage(buf: ArrayBuffer): Promise<ParsedTmhPackag
       if (f.data.byteLength > MAX_FONT_BYTES) errors.push(`Police trop grande : ${bn}`);
       else fontFiles.push({ path: bn, data: f.data });
     } else if (e === "pdf") {
+      pdfCount += 1;
       if (f.data.byteLength > MAX_PDF_BYTES) errors.push(`PDF trop grand : ${bn}`);
-      else
-        referencePdf = {
-          name: bn,
-          bytes: f.data,
-        };
+      else referencePdf = { name: bn, bytes: f.data };
     }
   }
 
-  if (!background) errors.push("Image de fond (PNG/JPG) manquante dans le paquet.");
-  if (!settings) errors.push("Fichier de réglages JSON manquant.");
-  if (!settings?.fields?.length) errors.push("Aucun champ défini dans les réglages.");
-  if (!settings?.page_width_mm || !settings?.page_height_mm) {
-    errors.push("Dimensions de page (mm) manquantes dans les réglages.");
+  if (jsonCount === 0) errors.push("Fichier de réglages JSON manquant.");
+  if (jsonCount > 1) errors.push("Un seul fichier JSON de réglages est autorisé.");
+  if (imageCount === 0) errors.push("Image de fond (PNG/JPG) manquante dans le paquet.");
+  if (imageCount > 1) errors.push("Une seule image de fond est autorisée dans le paquet.");
+  if (pdfCount > 1) errors.push("Un seul PDF de référence est autorisé dans le paquet.");
+  if (pdfCount === 0) {
+    warnings.push(
+      "PDF de référence TMH absent : la comparaison puis la confirmation du modèle seront impossibles."
+    );
   }
 
-  // Fonts required by settings must be present — no substitution
-  const fonts: ParsedTmhPackage["fonts"] = [];
+  let settings: TemplateSettings | undefined;
+  if (settingsRaw !== undefined && jsonCount === 1) {
+    const validated = validateTemplateSettings(settingsRaw);
+    if (!validated.ok) errors.push(...validated.errors);
+    else settings = validated.settings;
+  }
+
+  const fonts: ParsedFont[] = [];
   if (settings) {
-    const needed = new Set<string>();
-    for (const field of settings.fields) {
-      if (field.fontFamily) needed.add(field.fontFamily);
-    }
-    for (const map of settings.fonts || []) {
-      needed.add(map.family);
-    }
-    for (const family of needed) {
-      const mapped = (settings.fonts || []).find((x) => x.family === family);
-      const fileName = mapped?.file;
+    for (const map of settings.fonts) {
       const found = fontFiles.find(
-        (ff) =>
-          (fileName && ff.path.toLowerCase() === fileName.toLowerCase()) ||
-          ff.path.toLowerCase().includes(family.toLowerCase().replace(/\s+/g, ""))
+        (ff) => ff.path.toLowerCase() === map.file.toLowerCase()
       );
       if (!found) {
         errors.push(
-          `Police manquante ou illisible pour la famille « ${family} ». Substitution interdite.`
+          `Fichier de police introuvable : ${map.file} (${map.family}, ${map.weight === "bold" ? "gras" : "normal"}). Substitution interdite.`
         );
       } else {
-        fonts.push({ family, file: found.path, bytes: found.data });
+        fonts.push({
+          family: map.family,
+          file: found.path,
+          bytes: found.data,
+          weight: map.weight,
+        });
       }
-    }
-    if (needed.size === 0 && fontFiles.length === 0) {
-      errors.push("Aucune police fournie alors que le modèle en nécessite.");
     }
   }
 
   return {
     ok: errors.length === 0,
     errors,
+    warnings,
     background,
     settings,
     fonts,
@@ -175,12 +168,13 @@ export async function parseTmhPackage(buf: ArrayBuffer): Promise<ParsedTmhPackag
   };
 }
 
-/** Réglages d'exemple pour V1 (à ajuster avec le fond réel). */
+/** Réglages d'exemple V1. Le gras exige le fichier Bold du paquet. */
 export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
   page_width_mm: 297,
   page_height_mm: 210,
   fonts: [
-    { family: "CertificateSans", file: "CertificateSans-Regular.ttf" },
+    { family: "CertificateSans", file: "CertificateSans-Regular.ttf", weight: "normal" },
+    { family: "CertificateSans", file: "CertificateSans-Bold.ttf", weight: "bold" },
   ],
   fields: [
     {
@@ -192,6 +186,7 @@ export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
       fontWeight: "bold",
       color: "#1F2C3F",
       align: "center",
+      letterSpacing: 0,
       maxWidth_mm: 220,
       autoShrink: true,
     },
@@ -201,8 +196,11 @@ export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
       y_mm: 115,
       fontSize_pt: 16,
       fontFamily: "CertificateSans",
+      fontWeight: "normal",
       color: "#A1532D",
       align: "center",
+      letterSpacing: 0,
+      autoShrink: false,
     },
     {
       id: "temps",
@@ -210,8 +208,11 @@ export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
       y_mm: 130,
       fontSize_pt: 18,
       fontFamily: "CertificateSans",
+      fontWeight: "normal",
       color: "#1F2C3F",
       align: "center",
+      letterSpacing: 0,
+      autoShrink: false,
     },
     {
       id: "classement",
@@ -219,8 +220,11 @@ export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
       y_mm: 145,
       fontSize_pt: 14,
       fontFamily: "CertificateSans",
+      fontWeight: "normal",
       color: "#444444",
       align: "center",
+      letterSpacing: 0,
+      autoShrink: false,
     },
     {
       id: "edition",
@@ -228,8 +232,11 @@ export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
       y_mm: 175,
       fontSize_pt: 12,
       fontFamily: "CertificateSans",
+      fontWeight: "normal",
       color: "#666666",
       align: "center",
+      letterSpacing: 0,
+      autoShrink: false,
     },
   ],
 };

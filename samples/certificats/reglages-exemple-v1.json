@@ -2,7 +2,8 @@
   "page_width_mm": 297,
   "page_height_mm": 210,
   "fonts": [
-    { "family": "CertificateSans", "file": "CertificateSans-Regular.ttf" }
+    { "family": "CertificateSans", "file": "CertificateSans-Regular.ttf", "weight": "normal" },
+    { "family": "CertificateSans", "file": "CertificateSans-Bold.ttf", "weight": "bold" }
   ],
   "fields": [
     {
@@ -14,6 +15,7 @@
       "fontWeight": "bold",
       "color": "#1F2C3F",
       "align": "center",
+      "letterSpacing": 0,
       "maxWidth_mm": 220,
       "autoShrink": true
     },
@@ -23,6 +25,7 @@
       "y_mm": 115,
       "fontSize_pt": 16,
       "fontFamily": "CertificateSans",
+      "fontWeight": "normal",
       "color": "#A1532D",
       "align": "center"
     },
@@ -32,6 +35,7 @@
       "y_mm": 130,
       "fontSize_pt": 18,
       "fontFamily": "CertificateSans",
+      "fontWeight": "normal",
       "color": "#1F2C3F",
       "align": "center"
     },
@@ -41,6 +45,7 @@
       "y_mm": 145,
       "fontSize_pt": 14,
       "fontFamily": "CertificateSans",
+      "fontWeight": "normal",
       "color": "#444444",
       "align": "center"
     },
@@ -50,6 +55,7 @@
       "y_mm": 175,
       "fontSize_pt": 12,
       "fontFamily": "CertificateSans",
+      "fontWeight": "normal",
       "color": "#666666",
       "align": "center"
     }

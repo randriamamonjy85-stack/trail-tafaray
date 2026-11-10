@@ -32,9 +32,13 @@ Exemple fictif fourni : `samples/certificats/exemple-resultats-2026.csv`.
 2. Exportez depuis TMH :
    - image de fond JPG/PNG ;
    - **paquet ZIP** : fond HD, `reglages.json`, polices TTF/OTF, PDF d’exemple.
-3. Dans Admin → Certificats : uploader le fond et/ou le ZIP.
-4. **Aperçu PDF** (coureur fictif) → comparer mentalement au PDF de référence TMH.
-5. **Confirmer le modèle** (obligatoire avant publication).
+3. Dans Admin → Certificats : uploader le paquet ZIP (le fond seul seulement si besoin).
+4. **Comparer** côte à côte l'aperçu du site (coureur fictif Aina RABE) et le PDF de référence TMH.
+5. Si un texte est un peu décalé : régler dx / dy en millimètres, puis relancer la comparaison.
+6. Cocher la confirmation, puis **Confirmer le modèle** (obligatoire avant publication).
+
+Le gras utilise le fichier Bold fourni dans le ZIP. S'il manque, le modèle est refusé.
+`letterSpacing` est un espacement en points. Au-delà de `maxWidth_mm`, la taille du texte diminue.
 
 Fichier de réglages d’exemple (V1) : `samples/certificats/reglages-exemple-v1.json`  
 À ajuster une fois avec le vrai fond V1 (positions en mm).
@@ -42,7 +46,7 @@ Fichier de réglages d’exemple (V1) : `samples/certificats/reglages-exemple-v1
 ## 4. Publier
 
 1. **Publier** l’édition (impossible sans modèle confirmé).
-2. Optionnel : activer la page résultats publics (colonnes du fichier uniquement).
+2. Il n’y a pas de liste publique des coureurs. Chacun trouve son certificat avec édition + dossard + nom.
 3. **Masquer** pour retirer l’accès public.
 
 ## 5. Test public
@@ -55,5 +59,9 @@ Fichier de réglages d’exemple (V1) : `samples/certificats/reglages-exemple-v1
 
 - Pas de liste publique des coureurs.
 - Recherche : édition + dossard + nom (ensemble).
-- Limite d’essais côté serveur.
-- Tables Supabase : pas de lecture publique ; migration SQL à exécuter manuellement : `supabase/migrate_certificats.sql`.
+- Limite d’essais partagée (migration `supabase/migrate_certificats_securite.sql`).
+- Fond, polices et PDF de référence : bucket privé `certificats-prives` (pas le bucket photos).
+- Tables Supabase : pas de lecture publique. Migrations à exécuter à la main, dans l’ordre :
+  1. `supabase/migrate_certificats.sql`
+  2. `supabase/migrate_certificats_securite.sql`
+- Variable Vercel obligatoire : `ADMIN_EMAILS` (liste d’e-mails). Si elle est vide, personne n’entre dans l’admin.

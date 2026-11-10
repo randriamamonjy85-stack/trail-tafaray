@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { clientIp, enforceLimits } from "@/lib/rate-limit-shared";
 
+export const runtime = "nodejs";
+
+/**
+ * Ne liste jamais les coureurs.
+ * Le certificat se récupère un par un via /api/certificat/lookup.
+ */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const edition = searchParams.get("edition") || "";
-  if (!edition) return NextResponse.json({ error: "edition requise" }, { status: 400 });
-
-  const supabase = createAdminClient();
-  const { data: ed } = await supabase
-    .from("certificate_editions")
-    .select("id,published,results_public")
-    .eq("code", edition)
-    .maybeSingle();
-
-  if (!ed?.published || !ed.results_public) {
-    return NextResponse.json({ error: "Résultats non publics." }, { status: 404 });
+  try {
+    const supabase = createAdminClient();
+    const ok = await enforceLimits(supabase, [
+      {
+        prefix: "cert-results-ip-min",
+        raw: clientIp(request),
+        limit: 10,
+        windowMs: 60_000,
+      },
+    ]);
+    if (!ok) {
+      return NextResponse.json({ error: "Trop de tentatives." }, { status: 429 });
+    }
+  } catch {
+    /* pas de liste, même si le compteur est indisponible */
   }
-
-  const { data } = await supabase
-    .from("certificate_results")
-    .select(
-      "course,dossard,prenom,nom,genre,categorie,nationalite,statut,temps,classement_scratch,classement_genre,classement_categorie"
-    )
-    .eq("edition_id", ed.id)
-    .order("course")
-    .order("classement_scratch");
-
-  return NextResponse.json(data || []);
+  return NextResponse.json(
+    { error: "La liste publique des coureurs n'est pas disponible." },
+    { status: 404 }
+  );
 }

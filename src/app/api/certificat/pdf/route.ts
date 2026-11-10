@@ -2,17 +2,20 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeDossard, normalizeNom } from "@/lib/certificats/normalize";
 import { buildCertificatePdf } from "@/lib/certificats/pdf";
-import { rateLimit } from "@/lib/rate-limit";
+import { downloadCertBytes, loadTemplateFonts, mimeFromCertPath } from "@/lib/certificats/load-assets";
+import { parseOffsets } from "@/lib/certificats/validate-settings";
+import { clientIp, enforceLimits } from "@/lib/rate-limit-shared";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-  const rl = rateLimit(`cert-pdf:${ip}`, 5, 60_000);
-  if (!rl.ok) {
+  const supabase = createAdminClient();
+  const ip = clientIp(request);
+  const ipOk = await enforceLimits(supabase, [
+    { prefix: "cert-pdf-ip-min", raw: ip, limit: 5, windowMs: 60_000 },
+    { prefix: "cert-pdf-ip-hour", raw: ip, limit: 20, windowMs: 3_600_000 },
+  ]);
+  if (!ipOk) {
     return NextResponse.json({ error: "Trop de demandes." }, { status: 429 });
   }
 
@@ -25,7 +28,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paramètres incomplets." }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const bibOk = await enforceLimits(supabase, [
+    {
+      prefix: "cert-pdf-bib-hour",
+      raw: `${editionCode}|${dossard}`,
+      limit: 12,
+      windowMs: 3_600_000,
+    },
+  ]);
+  if (!bibOk) {
+    return NextResponse.json({ error: "Trop de demandes pour ce dossard." }, { status: 429 });
+  }
+
   const { data: ed } = await supabase
     .from("certificate_editions")
     .select("*")
@@ -50,24 +64,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Aucune correspondance." }, { status: 404 });
   }
 
-  const { data: bgFile } = await supabase.storage.from("photos").download(ed.template_bg_path);
-  if (!bgFile) return NextResponse.json({ error: "Modèle incomplet." }, { status: 500 });
-  const bgBytes = new Uint8Array(await bgFile.arrayBuffer());
-  const mime = ed.template_bg_path.endsWith(".png") ? "image/png" : "image/jpeg";
+  const mime = mimeFromCertPath(ed.template_bg_path);
+  const bgBytes = mime ? await downloadCertBytes(supabase, ed.template_bg_path) : null;
+  if (!mime || !bgBytes) {
+    return NextResponse.json({ error: "Modèle incomplet." }, { status: 500 });
+  }
 
-  const fonts: { family: string; bytes: Uint8Array }[] = [];
-  for (const f of ed.template_fonts || []) {
-    const { data: ff } = await supabase.storage.from("photos").download(f.path);
-    if (!ff)
-      return NextResponse.json({ error: "Police du modèle indisponible." }, { status: 500 });
-    fonts.push({ family: f.family, bytes: new Uint8Array(await ff.arrayBuffer()) });
+  const loaded = await loadTemplateFonts(supabase, ed.template_fonts);
+  if (!loaded.ok) {
+    return NextResponse.json({ error: "Police du modèle indisponible." }, { status: 500 });
+  }
+
+  const offsets = parseOffsets(ed.template_offsets ?? {});
+  if (!offsets.ok) {
+    return NextResponse.json({ error: "Décalages de modèle invalides." }, { status: 500 });
   }
 
   const built = await buildCertificatePdf({
     background: bgBytes,
     backgroundMime: mime,
     settings: ed.template_settings,
-    fonts,
+    fonts: loaded.fonts,
+    offsets: offsets.offsets,
     runner: {
       prenom: row.prenom,
       nom: row.nom,
@@ -88,6 +106,7 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="certificat-${ed.code}-${dossard}.pdf"`,
+      "Cache-Control": "no-store",
     },
   });
 }

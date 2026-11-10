@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeDossard, normalizeNom } from "@/lib/certificats/normalize";
-import { rateLimit } from "@/lib/rate-limit";
+import { clientIp, enforceLimits } from "@/lib/rate-limit-shared";
 
 export const runtime = "nodejs";
 
 /** Recherche un seul coureur (édition publiée + dossard + nom). Pas de liste. */
 export async function POST(request: Request) {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-  const rl = rateLimit(`cert-lookup:${ip}`, 8, 60_000);
-  if (!rl.ok) {
+  const supabase = createAdminClient();
+  const ip = clientIp(request);
+  const ipOk = await enforceLimits(supabase, [
+    { prefix: "cert-lookup-ip-min", raw: ip, limit: 8, windowMs: 60_000 },
+    { prefix: "cert-lookup-ip-hour", raw: ip, limit: 40, windowMs: 3_600_000 },
+  ]);
+  if (!ipOk) {
     return NextResponse.json(
       { error: "Trop de tentatives. Réessayez plus tard." },
       { status: 429 }
@@ -31,7 +32,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createAdminClient();
+  const bibOk = await enforceLimits(supabase, [
+    {
+      prefix: "cert-lookup-bib-hour",
+      raw: `${editionCode}|${dossard}`,
+      limit: 20,
+      windowMs: 3_600_000,
+    },
+  ]);
+  if (!bibOk) {
+    return NextResponse.json(
+      { error: "Trop de tentatives pour ce dossard. Réessayez plus tard." },
+      { status: 429 }
+    );
+  }
+
   const { data: ed } = await supabase
     .from("certificate_editions")
     .select("id,code,label,published")
@@ -76,7 +91,6 @@ export async function POST(request: Request) {
     prenom: row.prenom,
     nom: row.nom,
     temps: row.temps,
-    // token minimal for PDF: dossard+edition verified again server-side
     canDownload: true,
   });
 }

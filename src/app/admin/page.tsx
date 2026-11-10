@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
+import CertificatsAdmin from "@/components/admin/CertificatsAdmin";
 import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
 import CoursesAdmin from "@/components/admin/CoursesAdmin";
 import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
@@ -481,6 +482,7 @@ export default function AdminPage() {
         { id: "photos", label: "Photos", icon: "🖼️" },
         { id: "documents", label: "Documents", icon: "📄" },
         { id: "footer", label: "Pied de page", icon: "⬇️" },
+        { id: "certificats", label: "Certificats", icon: "🏅" },
         { id: "resultats", label: "Résultats", icon: "🏆" },
       ],
     },
@@ -1353,42 +1355,36 @@ export default function AdminPage() {
         <FooterAdmin settings={settings} setSettings={setSettings} saveSettings={saveSettings} />
       )}
       {tab === "courses" && <CoursesAdmin />}
+      {tab === "certificats" && <CertificatsAdmin />}
 
-{/* ========== RÉSULTATS ========== */}
       {tab === "resultats" && (
-        <div className="bg-white rounded-2xl border border-stone-200 p-6 max-w-3xl space-y-4">
-          <h2 className="text-xl font-bold text-[#1F2C3F]">Importer les résultats</h2>
-          <p className="text-sm text-stone-600">
-            Collez un tableau JSON. Format attendu :
-            <code className="block mt-1 text-xs bg-stone-50 p-2 rounded">
-              {`[{"position":1,"nom":"Rakoto","temps":"2:15:30","course":"Trail Endurance","categorie":"SEH","genre":"H"}]`}
-            </code>
-          </p>
-          <textarea
-            className="w-full border border-stone-300 rounded-lg px-4 py-3 font-mono text-xs"
-            rows={12}
-            value={resultatsText}
-            onChange={(e) => setResultatsText(e.target.value)}
-          />
-          <div className="flex gap-3">
-            <button
-              onClick={saveResultats}
-              className="bg-[#1F2C3F] text-white px-6 py-2 rounded-full font-medium"
-            >
-              Enregistrer les résultats
-            </button>
-            <button
-              onClick={() =>
-                toggleSetting("resultats_visibles", !settings.resultats_visibles)
-              }
-              className="border border-stone-300 px-6 py-2 rounded-full text-sm"
-            >
-              {settings.resultats_visibles
-                ? "Masquer sur le site"
-                : "Afficher sur le site"}
-            </button>
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-950">
+            <p className="font-semibold">Saisie manuelle des temps désactivée</p>
+            <p className="mt-1">
+              La source officielle est TMH / GmCAP. Utilisez l&apos;onglet{" "}
+              <strong>Certificats</strong> pour importer le fichier résultats-certificats.
+            </p>
           </div>
-          <p className="text-sm text-stone-500">{resultats.length} résultat(s) en base</p>
+          <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 text-sm text-stone-600">
+            <p>
+              Ancien import JSON conservé uniquement en secours. Préférez l&apos;onglet Certificats.
+            </p>
+            <textarea
+              className="w-full border border-stone-300 rounded-lg px-4 py-3 font-mono text-xs mt-3"
+              rows={8}
+              value={resultatsText}
+              onChange={(e) => setResultatsText(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={saveResultats}
+              className="mt-3 bg-stone-700 text-white px-4 py-2 rounded-full text-sm"
+            >
+              Enregistrer (legacy)
+            </button>
+            <p className="text-xs text-stone-500 mt-2">{resultats.length} résultat(s) en base</p>
+          </div>
         </div>
       )}
           </div>

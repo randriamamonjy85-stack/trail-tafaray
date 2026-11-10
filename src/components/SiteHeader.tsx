@@ -8,6 +8,7 @@ const links = [
   { href: "/courses", label: "Courses" },
   { href: "/inscription", label: "Inscription" },
   { href: "/resultats", label: "Résultats" },
+  { href: "/certificat", label: "Mon certificat" },
   { href: "/galerie", label: "Galerie" },
   { href: "/documents", label: "Documents" },
   { href: "/partenaires", label: "Partenaires" },

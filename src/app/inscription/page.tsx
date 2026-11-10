@@ -403,7 +403,7 @@ function InscriptionForm() {
               <input
                 className={inputCls}
                 inputMode="numeric"
-                placeholder="JJ/MM/AAAA ou 15061995"
+                placeholder="Jj/Mm/Aa"
                 value={form.dateNaissance}
                 onChange={onDateKeyboard}
                 maxLength={10}
@@ -426,7 +426,7 @@ function InscriptionForm() {
             </div>
             {dateError && <p className="text-sm text-red-600 mt-1">{dateError}</p>}
             <p className="text-xs text-stone-500 mt-1">
-              Tapez les 8 chiffres (ex. 15061995) ou utilisez le calendrier.
+              Tapez votre date de naissance ou utilisez le calendrier.
             </p>
           </Field>
 

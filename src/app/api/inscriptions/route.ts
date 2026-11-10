@@ -131,6 +131,13 @@ export async function POST(request: Request) {
     let tailleTee = sanitizeText(body.tailleTee, 10);
     if (course === "Zaza Tafaray") tailleTee = "";
 
+    if (body.acceptReglement !== true && body.acceptReglement !== "true" && body.acceptReglement !== 1) {
+      return NextResponse.json(
+        { success: false, error: "Vous devez accepter le règlement." },
+        { status: 400 }
+      );
+    }
+
     if (!prenom || !nom || !dateNaissance || !genre || !course || !telephone || !numeroIdentite) {
       return NextResponse.json(
         { success: false, error: "Champs obligatoires manquants." },
@@ -150,6 +157,10 @@ export async function POST(request: Request) {
         { success: false, error: "Adresse e-mail invalide." },
         { status: 400 }
       );
+    }
+
+    if (genre !== "Homme" && genre !== "Femme") {
+      return NextResponse.json({ success: false, error: "Genre invalide." }, { status: 400 });
     }
 
     if (!Object.keys(COURSE_TARIF_KEYS).includes(course)) {
@@ -194,14 +205,47 @@ export async function POST(request: Request) {
 
     const montantTotal = base + frais;
 
-    const { count } = await supabase
-      .from("inscriptions")
-      .select("*", { count: "exact", head: true })
-      .eq("course", course);
+    // Compteur non réutilisable : max séquence déjà attribuée (y compris refusées/supprimées si soft)
+    // + table reference_counters si disponible
+    let sequence = 1;
+    try {
+      const { data: counterRow } = await supabase
+        .from("reference_counters")
+        .select("last_seq")
+        .eq("course", course)
+        .maybeSingle();
+      if (counterRow && typeof counterRow.last_seq === "number") {
+        sequence = counterRow.last_seq + 1;
+        await supabase
+          .from("reference_counters")
+          .upsert({ course, last_seq: sequence }, { onConflict: "course" });
+      } else {
+        // Fallback : max numérique extrait des références existantes (ne recule pas si suppressions)
+        const { data: refs } = await supabase
+          .from("inscriptions")
+          .select("reference")
+          .eq("course", course);
+        let maxSeq = 0;
+        for (const r of refs || []) {
+          const m = String(r.reference || "").match(/(\d+)$/);
+          if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+        }
+        sequence = maxSeq + 1;
+        await supabase
+          .from("reference_counters")
+          .upsert({ course, last_seq: sequence }, { onConflict: "course" });
+      }
+    } catch {
+      const { count } = await supabase
+        .from("inscriptions")
+        .select("*", { count: "exact", head: true })
+        .eq("course", course);
+      sequence = (count || 0) + 1;
+    }
 
-    const sequence = (count || 0) + 1;
     const reference = generateReference(course, sequence);
     const now = new Date();
+    const acceptedAt = now.toISOString();
 
     const { error } = await supabase.from("inscriptions").insert({
       reference,
@@ -228,6 +272,7 @@ export async function POST(request: Request) {
       reference_paiement: referencePaiement,
       montant_declare: montantTotal,
       exporte: false,
+      reglement_accepte_at: acceptedAt,
     });
 
     if (error) {

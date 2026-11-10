@@ -2,11 +2,24 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminSession } from "@/lib/supabase/require-admin";
 
-export async function GET() {
+/** Public : courses actives seulement */
+export async function GET(request: Request) {
   const supabase = createAdminClient();
+  const { searchParams } = new URL(request.url);
+  const all = searchParams.get("all") === "1";
+
+  if (all) {
+    const gate = await requireAdminSession();
+    if (gate.response) return gate.response;
+    const { data, error } = await gate.admin!.from("courses").select("*").order("ordre");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data || []);
+  }
+
   const { data, error } = await supabase
     .from("courses")
-    .select("*")
+    .select("id,nom,slug,distance,denivele,type_epreuve,tarif,image_url,ordre,active")
+    .eq("active", true)
     .order("ordre");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data || []);

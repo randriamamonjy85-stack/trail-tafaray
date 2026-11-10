@@ -41,16 +41,7 @@ export async function POST(request: Request) {
       .eq("id", 1)
       .single();
 
-    const qrPayload = encodeURIComponent(
-      JSON.stringify({
-        ref: row.reference,
-        nom: row.nom,
-        prenom: row.prenom,
-        course: row.course,
-        categorie: row.categorie,
-        statut: "Validé",
-      })
-    );
+    const qrPayload = encodeURIComponent(String(row.reference || ""));
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrPayload}`;
 
     const defaultTpl =

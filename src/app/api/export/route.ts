@@ -2,15 +2,27 @@ import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/supabase/require-admin";
 import { writeAudit } from "@/lib/audit";
 
-/** Anti CSV injection : préfixer si commence par = + - @ */
-function csvSafe(val: unknown): string {
+function escapeCsv(val: unknown): string {
   let s = String(val ?? "");
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  // strip control chars except tab handled below
+  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+  // neutralize formula-like starts (after leading whitespace/tabs/newlines)
+  const stripped = s.replace(/^[\s\t\r\n]+/, "");
+  if (/^[=+\-@\t\r]/.test(stripped) || /^[=+\-@]/.test(s)) {
+    s = "'" + s;
+  }
+  if (s.length > 500) s = s.slice(0, 500);
   return `"${s.replace(/"/g, '""')}"`;
 }
 
+function phoneOut(v: unknown): string {
+  // Keep digits and leading + if present for readability; TMH had + stripped historically
+  const s = String(v ?? "").trim();
+  return s.replace(/^\+/, "");
+}
+
 function toCsvRow(row: any): string {
-  const fields = [
+  return [
     row.reference,
     row.prenom,
     row.nom,
@@ -19,34 +31,44 @@ function toCsvRow(row: any): string {
     row.categorie,
     row.nationalite,
     row.email,
-    String(row.telephone || "").replace(/^\+/, ""),
+    phoneOut(row.telephone),
     row.adresse,
     row.organisation,
     row.taille_tee,
     row.navette,
-    String(row.places_navette ?? 0),
+    row.places_navette,
     row.course,
     row.contact_urgence,
-    String(row.telephone_urgence || "").replace(/^\+/, ""),
+    phoneOut(row.telephone_urgence),
     row.numero_identite,
     "Validé",
     row.cree_le,
-  ];
-  return fields.map(csvSafe).join(";");
+  ]
+    .map(escapeCsv)
+    .join(";");
 }
 
 export async function GET(request: Request) {
   const gate = await requireAdminSession();
   if (gate.response) return gate.response;
 
-  const { searchParams } = new URL(request.url);
-  const onlyNew = searchParams.get("onlyNew") === "true";
-
   const supabase = gate.admin!;
-  let query = supabase.from("inscriptions").select("*").eq("statut", "Validé");
-  if (onlyNew) query = query.eq("exporte", false);
+  const { searchParams } = new URL(request.url);
+  const onlyNew = searchParams.get("nouvelles") === "1";
+  // mark=0 → download without marking exported (safer for interrupted downloads)
+  const mark = searchParams.get("mark") !== "0";
 
-  const { data, error } = await query;
+  let q = supabase
+    .from("inscriptions")
+    .select("*")
+    .eq("statut", "Validé")
+    .order("created_at", { ascending: true });
+
+  if (onlyNew) {
+    q = q.or("exporte.is.null,exporte.eq.false");
+  }
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (!data || data.length === 0) {
@@ -59,15 +81,23 @@ export async function GET(request: Request) {
   const header =
     "Référence;Prénom;Nom;Date de naissance;Genre;Catégorie;Nationalité;Email;Téléphone;Adresse;Organisation;Taille de tee-shirt;Navette;Places navette;Course;Contact d'urgence;Téléphone d'urgence;Numéro d'identité ou passeport;Statut;Créée le";
   const rows = data.map(toCsvRow);
-  const csv = [header, ...rows].join("\n");
+  const csv = "\uFEFF" + [header, ...rows].join("\r\n");
 
-  const ids = data.map((d) => d.id);
-  await supabase
-    .from("inscriptions")
-    .update({ exporte: true, date_export: new Date().toISOString() })
-    .in("id", ids);
+  if (mark) {
+    const ids = data.map((d) => d.id);
+    await supabase
+      .from("inscriptions")
+      .update({ exporte: true, date_export: new Date().toISOString() })
+      .in("id", ids);
+  }
 
-  await writeAudit(supabase, gate.user?.email, "export_tmh", "inscriptions", `${data.length} lignes`);
+  await writeAudit(
+    supabase,
+    gate.user?.email,
+    mark ? "export_tmh" : "export_tmh_preview",
+    "inscriptions",
+    `${data.length} lignes`
+  );
 
   return new NextResponse(csv, {
     headers: {

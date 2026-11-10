@@ -3,7 +3,7 @@ export type Inscription = {
   reference: string;
   prenom: string;
   nom: string;
-  dateNaissance: string; // DD/MM/YYYY
+  dateNaissance: string;
   genre: string;
   categorie: string;
   nationalite: string;
@@ -19,7 +19,7 @@ export type Inscription = {
   telephoneUrgence: string;
   numeroIdentite: string;
   statut: "En attente" | "Validé" | "Refusé";
-  creeLe: string; // DD/MM/YYYY
+  creeLe: string;
   operateur?: string;
   referencePaiement?: string;
   montantDeclare?: number;
@@ -36,7 +36,7 @@ export const COURSES = [
   "Duathlon Nature",
 ] as const;
 
-export function generateReference(course: string, sequence: number): string {
+export function coursePrefix(course: string): string {
   const prefixes: Record<string, string> = {
     "Zaza Tafaray": "TTTZT",
     "Trail Découverte": "TTTTD",
@@ -45,13 +45,26 @@ export function generateReference(course: string, sequence: number): string {
     "VTT BEKA": "TTTVTT",
     "Duathlon Nature": "TTTDN",
   };
-  const prefix = prefixes[course] || "TTTXX";
+  return prefixes[course] || "TTTXX";
+}
+
+export function generateReference(course: string, sequence: number): string {
+  const prefix = coursePrefix(course);
   return `${prefix}${String(sequence).padStart(5, "0")}`;
 }
 
-export function formatDate(date: Date): string {
-  const d = String(date.getDate()).padStart(2, "0");
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const y = date.getFullYear();
+/** Date jj/mm/aaaa en heure Madagascar (UTC+3). */
+export function formatDate(date: Date = new Date()): string {
+  const fmt = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Indian/Antananarivo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  // fr-FR often gives dd/mm/yyyy
+  const parts = fmt.formatToParts(date);
+  const d = parts.find((p) => p.type === "day")?.value || "01";
+  const m = parts.find((p) => p.type === "month")?.value || "01";
+  const y = parts.find((p) => p.type === "year")?.value || "2026";
   return `${d}/${m}/${y}`;
 }

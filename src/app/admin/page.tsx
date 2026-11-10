@@ -536,16 +536,25 @@ export default function AdminPage() {
               A → Z
             </label>
             <span className="text-sm text-stone-500">{filtered.length} inscription(s)</span>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto flex flex-wrap gap-2">
+              <a
+                href="/api/export?mark=0"
+                className="border border-stone-300 text-stone-700 px-4 py-2 rounded-full text-sm font-medium hover:bg-stone-50"
+                title="Télécharge le CSV sans marquer les lignes comme exportées"
+              >
+                Prévisualiser CSV
+              </a>
               <a
                 href="/api/export"
                 className="bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium"
+                title="Export toutes les validées et marque comme exportées"
               >
                 Export TMH (validées)
               </a>
               <a
-                href="/api/export?onlyNew=true"
+                href="/api/export?nouvelles=1"
                 className="bg-stone-700 text-white px-4 py-2 rounded-full text-sm font-medium"
+                title="Seulement les validées pas encore exportées"
               >
                 Export nouvelles
               </a>

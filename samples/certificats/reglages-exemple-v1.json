@@ -1,0 +1,57 @@
+{
+  "page_width_mm": 297,
+  "page_height_mm": 210,
+  "fonts": [
+    { "family": "CertificateSans", "file": "CertificateSans-Regular.ttf" }
+  ],
+  "fields": [
+    {
+      "id": "nom_complet",
+      "x_mm": 148.5,
+      "y_mm": 95,
+      "fontSize_pt": 28,
+      "fontFamily": "CertificateSans",
+      "fontWeight": "bold",
+      "color": "#1F2C3F",
+      "align": "center",
+      "maxWidth_mm": 220,
+      "autoShrink": true
+    },
+    {
+      "id": "course",
+      "x_mm": 148.5,
+      "y_mm": 115,
+      "fontSize_pt": 16,
+      "fontFamily": "CertificateSans",
+      "color": "#A1532D",
+      "align": "center"
+    },
+    {
+      "id": "temps",
+      "x_mm": 148.5,
+      "y_mm": 130,
+      "fontSize_pt": 18,
+      "fontFamily": "CertificateSans",
+      "color": "#1F2C3F",
+      "align": "center"
+    },
+    {
+      "id": "classement",
+      "x_mm": 148.5,
+      "y_mm": 145,
+      "fontSize_pt": 14,
+      "fontFamily": "CertificateSans",
+      "color": "#444444",
+      "align": "center"
+    },
+    {
+      "id": "edition",
+      "x_mm": 148.5,
+      "y_mm": 175,
+      "fontSize_pt": 12,
+      "fontFamily": "CertificateSans",
+      "color": "#666666",
+      "align": "center"
+    }
+  ]
+}

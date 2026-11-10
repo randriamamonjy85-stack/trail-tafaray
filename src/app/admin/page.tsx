@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
+import CertificatsAdmin from "@/components/admin/CertificatsAdmin";
 import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
 import CoursesAdmin from "@/components/admin/CoursesAdmin";
 import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
@@ -481,7 +482,8 @@ export default function AdminPage() {
         { id: "photos", label: "Photos", icon: "🖼️" },
         { id: "documents", label: "Documents", icon: "📄" },
         { id: "footer", label: "Pied de page", icon: "⬇️" },
-        { id: "resultats", label: "Résultats", icon: "🏆" },
+        { id: "certificats", label: "Certificats", icon: "🏅" },
+        { id: "resultats", label: "Résultats (legacy)", icon: "🏆" },
       ],
     },
     {
@@ -1355,7 +1357,17 @@ export default function AdminPage() {
       {tab === "courses" && <CoursesAdmin />}
 
 {/* ========== RÉSULTATS ========== */}
+      {tab === "certificats" && <CertificatsAdmin />}
+
       {tab === "resultats" && (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-950">
+            <p className="font-semibold">Saisie manuelle des temps désactivée</p>
+            <p className="mt-1">
+              La source officielle est TMH / GmCAP. Utilisez l&apos;onglet{" "}
+              <strong>Certificats</strong> pour importer le fichier résultats-certificats.
+            </p>
+          </div>
         <div className="bg-white rounded-2xl border border-stone-200 p-6 max-w-3xl space-y-4">
           <h2 className="text-xl font-bold text-[#1F2C3F]">Importer les résultats</h2>
           <p className="text-sm text-stone-600">

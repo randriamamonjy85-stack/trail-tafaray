@@ -6,7 +6,9 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:certificats": "vitest run src/lib/certificats"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -14,7 +16,10 @@
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "nodemailer": "^7.0.7"
+    "nodemailer": "^7.0.7",
+    "pdf-lib": "^1.17.1",
+    "jszip": "^3.10.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -25,6 +30,7 @@
     "eslint-config-next": "16.4.5",
     "postcss": "^8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.0"
   }
 }

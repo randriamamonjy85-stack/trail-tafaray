@@ -62,8 +62,8 @@ const defaultSettings: Settings = {
   pay_mvola_actif: true,
   pay_orange_actif: true,
   pay_airtel_actif: true,
-  date_reference_categories: "2026-10-25",
-  annee_reference_categories: 2026,
+  date_reference_categories: "2027-10-24",
+  annee_reference_categories: 2027,
 };
 
 const inputCls =
@@ -373,7 +373,7 @@ function InscriptionForm() {
     <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
       <p className="text-stone-600 mb-8">
-        Remplissez le formulaire en une seule page / Fenoy ity taratasy ity. Les champs * sont
+        Remplissez le formulaire en une seule étape / Fenoy ity taratasy ity. Les champs * sont
         obligatoires / Tsy maintsy fenoina ny misy *.
       </p>
 
@@ -551,7 +551,7 @@ function InscriptionForm() {
           </Field>
 
           {showTee && (
-            <Field label="Taille de t-shirt" labelMg="Haben'ny akanjo">
+            <Field label="Taille de t-shirt" labelMg="Haben'ny t-shirt">
               <select
                 className={inputCls}
                 value={form.tailleTee}
@@ -569,7 +569,7 @@ function InscriptionForm() {
           )}
         </Section>
 
-        <Section title="3. Contact d'urgence" titleMg="3. Nomerao Maika">
+        <Section title="3. Contact d'urgence" titleMg="3. laharana Maika">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom du contact" labelMg="Anaran'ilay olona">
               <input
@@ -578,7 +578,7 @@ function InscriptionForm() {
                 onChange={(e) => set("contactUrgence", e.target.value)}
               />
             </Field>
-            <Field label="Téléphone d'urgence" labelMg="Finday maika">
+            <Field label="Téléphone d'urgence" labelMg="laharan'ilay olona">
               <input
                 className={inputCls}
                 value={form.telephoneUrgence}

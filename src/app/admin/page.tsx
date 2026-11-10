@@ -385,35 +385,51 @@ export default function AdminPage() {
       return an.localeCompare(bn, "fr");
     });
 
-  if (loading) return <div className="p-20 text-center">Chargement...</div>;
+    if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] text-stone-300">
+        Chargement de l&apos;administration…
+      </div>
+    );
+  }
 
   if (!session) {
     return (
-      <div className="max-w-md mx-auto px-4 py-20">
-        <div className="bg-white rounded-2xl border border-stone-200 p-8">
-          <h1 className="text-2xl font-bold text-[#1F2C3F] mb-6 text-center">
-            Administration Trail Tafaray
-          </h1>
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] px-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 border border-stone-100">
+          <div className="text-center mb-8">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#1F2C3F] text-white font-bold mb-4">
+              TT
+            </div>
+            <h1 className="text-2xl font-bold text-[#1F2C3F]">Administration</h1>
+            <p className="text-sm text-stone-500 mt-1">Trail Tafaray — accès réservé</p>
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email admin"
-              className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              required
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mot de passe"
-              className="w-full border border-stone-300 rounded-lg px-4 py-3"
-              required
-            />
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@…"
+                className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5b4dff]/40"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Mot de passe</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#5b4dff]/40"
+                required
+              />
+            </div>
             <button
               type="submit"
-              className="w-full bg-[#1F2C3F] text-white py-3 rounded-full font-medium"
+              className="w-full bg-[#5b4dff] hover:bg-[#4a3de0] text-white py-3 rounded-xl font-semibold text-sm transition"
             >
               Connexion
             </button>
@@ -445,58 +461,138 @@ export default function AdminPage() {
     );
   };
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "inscriptions", label: "Inscriptions" },
-    { id: "courses", label: "Courses" },
-    { id: "categories", label: "Catégories âge" },
-    { id: "contenu", label: "Contenu" },
-    { id: "visibilite", label: "Visibilité" },
-    { id: "mobile", label: "Mobile Money" },
-    { id: "partenaires", label: "Partenaires" },
-    { id: "actualites", label: "Actualités" },
-    { id: "photos", label: "Photos" },
-    { id: "resultats", label: "Résultats" },
-    { id: "documents", label: "Documents" },
-    { id: "footer", label: "Pied de page" },
-    { id: "audit", label: "Journal audit" },
+  const navGroups: { title: string; items: { id: Tab; label: string; icon: string }[] }[] = [
+    {
+      title: "Gestion",
+      items: [
+        { id: "inscriptions", label: "Inscriptions", icon: "📋" },
+        { id: "mobile", label: "Mobile Money", icon: "💳" },
+        { id: "courses", label: "Courses", icon: "🏃" },
+        { id: "categories", label: "Catégories âge", icon: "🏷️" },
+      ],
+    },
+    {
+      title: "Contenu du site",
+      items: [
+        { id: "contenu", label: "Textes & accueil", icon: "✏️" },
+        { id: "visibilite", label: "Visibilité modules", icon: "👁️" },
+        { id: "partenaires", label: "Partenaires", icon: "🤝" },
+        { id: "actualites", label: "Actualités", icon: "📰" },
+        { id: "photos", label: "Photos", icon: "🖼️" },
+        { id: "documents", label: "Documents", icon: "📄" },
+        { id: "footer", label: "Pied de page", icon: "⬇️" },
+        { id: "resultats", label: "Résultats", icon: "🏆" },
+      ],
+    },
+    {
+      title: "Système",
+      items: [{ id: "audit", label: "Journal audit", icon: "🔒" }],
+    },
   ];
 
+  const currentLabel =
+    navGroups.flatMap((g) => g.items).find((i) => i.id === tab)?.label || "Administration";
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-[#1F2C3F]">Administration</h1>
-          <p className="text-stone-600 text-sm">Connecté : {session.user.email}</p>
+    <div className="min-h-screen bg-[#eef1f6] flex">
+      {/* Sidebar */}
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-[#0f172a] text-stone-300">
+        <div className="px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-[#5b4dff] flex items-center justify-center text-white text-xs font-bold">
+              TT
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm leading-tight">Trail Tafaray</p>
+              <p className="text-[11px] text-stone-400">Administration</p>
+            </div>
+          </div>
         </div>
-        <button onClick={handleLogout} className="text-sm text-stone-500 hover:text-stone-800">
-          Déconnexion
-        </button>
-      </div>
-
-      {message && (
-        <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-xl text-sm">
-          {message}
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+          {navGroups.map((group) => (
+            <div key={group.title}>
+              <p className="px-2 mb-2 text-[10px] uppercase tracking-widest text-stone-500 font-semibold">
+                {group.title}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTab(item.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition ${
+                      tab === item.id
+                        ? "bg-[#5b4dff] text-white shadow-sm"
+                        : "text-stone-300 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-base leading-none w-5 text-center">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-white/10 text-[11px] text-stone-500">
+          Connecté
+          <p className="text-stone-300 truncate mt-0.5">{session.user.email}</p>
         </div>
-      )}
+      </aside>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-8 border-b border-stone-200 pb-3">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-              tab === t.id
-                ? "bg-[#1F2C3F] text-white"
-                : "bg-white border border-stone-200 text-stone-700 hover:bg-stone-50"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Main */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-stone-200/80 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="md:hidden">
+              <select
+                value={tab}
+                onChange={(e) => setTab(e.target.value as Tab)}
+                className="border border-stone-300 rounded-lg px-2 py-1.5 text-sm max-w-[11rem]"
+              >
+                {navGroups.flatMap((g) =>
+                  g.items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-stone-400 font-medium">
+                Paramètres
+              </p>
+              <h1 className="text-lg sm:text-xl font-bold text-[#1F2C3F] truncate">
+                {currentLabel}
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-xs text-stone-500 truncate max-w-[180px]">
+              {session.user.email}
+            </span>
+            <span className="hidden sm:inline text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#5b4dff]/10 text-[#5b4dff]">
+              Administrateur
+            </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-sm text-stone-500 hover:text-[#5b4dff] font-medium"
+            >
+              Déconnexion
+            </button>
+          </div>
+        </header>
 
-      {/* ========== INSCRIPTIONS ========== */}
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">
+          {message && (
+            <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm">
+              {message}
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-4 sm:p-6">
       {tab === "inscriptions" && (
         <div>
           <div className="flex flex-wrap gap-3 mb-6 items-center">
@@ -1295,6 +1391,9 @@ export default function AdminPage() {
           <p className="text-sm text-stone-500">{resultats.length} résultat(s) en base</p>
         </div>
       )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

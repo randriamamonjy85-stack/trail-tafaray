@@ -612,8 +612,7 @@ function InscriptionForm() {
             </Field>
           )}
           <p className="text-sm text-stone-500">
-            Tarif navette : {(settings.tarif_navette || 20000).toLocaleString("fr-MG")} Ar / personne
-            (modifiable dans l&apos;admin).
+            Tarif navette : {(settings.tarif_navette || 20000).toLocaleString("fr-MG")} Ar / personne.
           </p>
         </Section>
 
@@ -647,7 +646,7 @@ function InscriptionForm() {
               value={form.operateur}
               onChange={(e) => set("operateur", e.target.value)}
             >
-              <option value="">Choisir / Fidiana</option>
+              <option value="">Choisir / Fidio</option>
               {settings.pay_mvola_actif !== false && <option>MVola</option>}
               {settings.pay_orange_actif !== false && <option>Orange Money</option>}
               {settings.pay_airtel_actif !== false && <option>Airtel Money</option>}

@@ -1,18 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAllowedAdminEmail } from "@/lib/admin-allowlist";
 import { NextResponse } from "next/server";
 
 /**
  * E-mails administrateurs autorisés.
- * Variable Vercel : ADMIN_EMAILS=trailtafaray@gmail.com,autre@exemple.com
- * Si vide : tout utilisateur connecté (comportement ancien — à éviter en prod).
+ * Variable Vercel : ADMIN_EMAILS=adresse@exemple.com,autre@exemple.com
+ * Si la liste est vide, personne n'est administrateur.
  */
-function allowedAdminEmails(): string[] {
-  const raw = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "";
-  return raw
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+function adminAllowlistRaw(): string {
+  return process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "";
 }
 
 export async function requireAdminSession() {
@@ -25,13 +22,12 @@ export async function requireAdminSession() {
     };
   }
 
-  const email = (data.user.email || "").toLowerCase();
-  const allow = allowedAdminEmails();
-  if (allow.length > 0 && !allow.includes(email)) {
+  const email = data.user.email || "";
+  if (!isAllowedAdminEmail(email, adminAllowlistRaw())) {
     return {
       user: null,
       response: NextResponse.json(
-        { error: "Compte non administrateur" },
+        { error: "Accès administrateur refusé" },
         { status: 403 }
       ),
     };

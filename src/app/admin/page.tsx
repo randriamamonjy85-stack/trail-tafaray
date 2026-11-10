@@ -23,7 +23,8 @@ type Tab =
   | "courses"
   | "documents"
   | "audit"
-  | "footer";
+  | "footer"
+  | "certificats";
 
 type Inscription = {
   id: string;
@@ -112,11 +113,13 @@ export default function AdminPage() {
   const [partenaires, setPartenaires] = useState<any[]>([]);
   const [actualites, setActualites] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
-  const [resultats, setResultats] = useState<any[]>([]);
   const [smsTexte, setSmsTexte] = useState("");
   const [smsMatches, setSmsMatches] = useState<any[]>([]);
   const [smsMsg, setSmsMsg] = useState("");
-  const [resultatsText, setResultatsText] = useState("");
+  const [gate, setGate] = useState<{ id: string; status: "checking" | "ok" | "denied" }>({
+    id: "",
+    status: "checking",
+  });
 
   // Forms
   const [partenaireForm, setPartenaireForm] = useState({
@@ -176,24 +179,38 @@ export default function AdminPage() {
     setPhotos(data || []);
   }, [supabase]);
 
-  const loadResultats = useCallback(async () => {
-    const res = await fetch("/api/results");
-    if (res.ok) {
-      const data = await res.json();
-      setResultats(data);
-      setResultatsText(JSON.stringify(data, null, 2));
-    }
-  }, []);
+  const sessionKey = session?.user?.id ?? "";
+  if (gate.id !== sessionKey) {
+    setGate({ id: sessionKey, status: "checking" });
+  }
+  const adminOk = sessionKey !== "" && gate.id === sessionKey && gate.status === "ok";
+  const adminDenied = sessionKey !== "" && gate.id === sessionKey && gate.status === "denied";
 
   useEffect(() => {
-    if (!session) return;
-    loadInscriptions();
-    loadSettings();
-    loadPartenaires();
-    loadActualites();
-    loadPhotos();
-    loadResultats();
-  }, [session]);
+    if (!sessionKey) return;
+    let cancelled = false;
+    fetch("/api/admin/me")
+      .then((r) => {
+        if (cancelled) return;
+        const status = r.ok ? "ok" : "denied";
+        setGate({ id: sessionKey, status });
+        if (r.ok) {
+          loadInscriptions();
+          loadSettings();
+          loadPartenaires();
+          loadActualites();
+          loadPhotos();
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGate({ id: sessionKey, status: "denied" });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Chargement initial une fois le droit admin confirmé.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,24 +358,7 @@ export default function AdminPage() {
     loadPhotos();
   };
 
-  const saveResultats = async () => {
-    try {
-      const parsed = JSON.parse(resultatsText);
-      const res = await fetch("/api/results", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      if (res.ok) {
-        showMsg("Résultats enregistrés");
-        loadResultats();
-      } else alert("Erreur");
-    } catch {
-      alert("JSON invalide");
-    }
-  };
-
-    const filtered = inscriptions
+  const filtered = inscriptions
     .filter((i) => {
       if (filterStatut !== "Tous" && i.statut !== filterStatut) return false;
       if (filterCourse !== "Toutes" && i.course !== filterCourse) return false;
@@ -440,6 +440,33 @@ export default function AdminPage() {
     );
   }
 
+  if (!adminOk) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] px-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 border border-stone-100 text-center">
+          {!adminDenied ? (
+            <p className="text-stone-600">Vérification des droits…</p>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold text-[#1F2C3F]">Accès refusé</h1>
+              <p className="text-sm text-stone-600 mt-3">
+                Ce compte n&apos;est pas administrateur, ou la liste ADMIN_EMAILS n&apos;est pas
+                renseignée sur le serveur. Sans cette liste, personne n&apos;a accès à
+                l&apos;administration.
+              </p>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="mt-6 border border-stone-300 px-4 py-2 rounded-full text-sm"
+              >
+                Se déconnecter
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const matchSmsPaiement = async () => {
     setSmsMsg("");
@@ -1363,27 +1390,9 @@ export default function AdminPage() {
             <p className="font-semibold">Saisie manuelle des temps désactivée</p>
             <p className="mt-1">
               La source officielle est TMH / GmCAP. Utilisez l&apos;onglet{" "}
-              <strong>Certificats</strong> pour importer le fichier résultats-certificats.
+              <strong>Certificats</strong> pour importer le fichier résultats-certificats
+              (13 colonnes). L&apos;ancien import JSON n&apos;est plus accepté par le serveur.
             </p>
-          </div>
-          <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 text-sm text-stone-600">
-            <p>
-              Ancien import JSON conservé uniquement en secours. Préférez l&apos;onglet Certificats.
-            </p>
-            <textarea
-              className="w-full border border-stone-300 rounded-lg px-4 py-3 font-mono text-xs mt-3"
-              rows={8}
-              value={resultatsText}
-              onChange={(e) => setResultatsText(e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={saveResultats}
-              className="mt-3 bg-stone-700 text-white px-4 py-2 rounded-full text-sm"
-            >
-              Enregistrer (legacy)
-            </button>
-            <p className="text-xs text-stone-500 mt-2">{resultats.length} résultat(s) en base</p>
           </div>
         </div>
       )}

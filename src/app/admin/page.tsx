@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { COURSES } from "@/lib/types";
 import CertificatsAdmin from "@/components/admin/CertificatsAdmin";
+import SponsorsAdmin from "@/components/admin/SponsorsAdmin";
 import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
 import CoursesAdmin from "@/components/admin/CoursesAdmin";
 import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
@@ -24,7 +25,8 @@ type Tab =
   | "documents"
   | "audit"
   | "footer"
-  | "certificats";
+  | "certificats"
+  | "sponsors";
 
 type Inscription = {
   id: string;
@@ -505,6 +507,7 @@ export default function AdminPage() {
         { id: "contenu", label: "Textes & accueil", icon: "✏️" },
         { id: "visibilite", label: "Visibilité modules", icon: "👁️" },
         { id: "partenaires", label: "Partenaires", icon: "🤝" },
+        { id: "sponsors", label: "Sponsors", icon: "📢" },
         { id: "actualites", label: "Actualités", icon: "📰" },
         { id: "photos", label: "Photos", icon: "🖼️" },
         { id: "documents", label: "Documents", icon: "📄" },
@@ -1383,6 +1386,7 @@ export default function AdminPage() {
       )}
       {tab === "courses" && <CoursesAdmin />}
       {tab === "certificats" && <CertificatsAdmin />}
+      {tab === "sponsors" && <SponsorsAdmin />}
 
       {tab === "resultats" && (
         <div className="space-y-4">

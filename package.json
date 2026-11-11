@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:certificats": "vitest run src/lib/certificats"
+    "test:certificats": "vitest run src/lib/certificats",
+    "test:sponsors": "vitest run src/lib/sponsors"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

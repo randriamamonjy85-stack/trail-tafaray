@@ -4,6 +4,7 @@ import "./globals.css";
 import Image from "next/image";
 import SiteFooter from "@/components/SiteFooter";
 import SiteHeader from "@/components/SiteHeader";
+import SponsorsPublic from "@/components/sponsors/SponsorsPublic";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900 antialiased">
         <SiteHeader />
         <main className="flex-1">{children}</main>
+        <SponsorsPublic />
         <SiteFooter />
       </body>
     </html>

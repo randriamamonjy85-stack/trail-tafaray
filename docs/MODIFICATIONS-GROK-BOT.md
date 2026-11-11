@@ -94,3 +94,43 @@ Aucun nouveau service payant. Pas de clé à ajouter pour les polices ou la limi
 - Le fond, les polices et le PDF de référence restent dans le bucket privé. Pas de bucket public pour ces fichiers.
 - Pas de liste publique des coureurs. Chacun retrouve son certificat avec édition + dossard + nom.
 - Ne pas montrer de secret, de clé `service_role`, ni de donnée réelle de coureur dans les exemples, les tests ou les captures.
+
+---
+
+# Modifications du 11/11/2026 — Espace publicité sponsors
+
+Auteur : Grok (assistant)
+
+## Objectif
+
+Ajouter un espace publicité sponsors : admin CRUD, pop-up (une fois par visite), bande de logos, compteurs anonymes (vues / clics). Sans toucher aux inscriptions, export CSV 20 colonnes, certificats ni à la sécurité admin existante.
+
+## Fichiers ajoutés
+
+- `supabase/migrate_sponsors.sql` — table `sponsors`, RLS lecture publique limitée, fonction `increment_sponsor_stat` (security definer). **Non exécuté dans cette PR.**
+- `src/lib/sponsors/logic.ts` — dates actives, pages exclues, rotation, types d’image autorisés.
+- `src/lib/sponsors/__tests__/logic.test.ts` — tests unitaires.
+- `src/app/api/sponsors/route.ts` — GET liste publique.
+- `src/app/api/sponsors/track/route.ts` — POST vue/clic via RPC (rate-limit, pas d’IP stockée).
+- `src/app/api/admin/sponsors/route.ts` — CRUD + upload image (ADMIN_EMAILS / requireAdminSession).
+- `src/components/admin/SponsorsAdmin.tsx` — interface admin.
+- `src/components/sponsors/SponsorsPublic.tsx`, `SponsorPopup.tsx`, `SponsorBanner.tsx` — affichage public.
+
+## Fichiers modifiés
+
+- `src/app/layout.tsx` — `SponsorsPublic` (pop-up + bande ; exclus inscription / admin / certificat).
+- `src/app/admin/page.tsx` — onglet **Sponsors**.
+- `package.json` — script `test:sponsors`.
+
+## Ce qui n’a pas changé
+
+- Certificats, polices PDF, buckets privés, ADMIN_EMAILS strict.
+- Export TMH 20 colonnes.
+- Migrations certificats déjà exécutées : non relancées / non modifiées.
+
+## Pour Hoby avant / après fusion
+
+1. Exécuter `supabase/migrate_sponsors.sql` dans Supabase SQL.
+2. Créer un bucket Storage **public** nommé `sponsors` (si l’upload échoue).
+3. Fusionner la PR puis vérifier Admin → Sponsors.
+

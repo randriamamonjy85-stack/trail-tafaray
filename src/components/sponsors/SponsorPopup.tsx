@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SponsorRecord } from "@/lib/sponsors/logic";
-import { pickRotatedSponsor, sponsorsForPopup } from "@/lib/sponsors/logic";
+import {
+  pickRotatedSponsor,
+  sponsorSiteHref,
+  sponsorsForPopup,
+  type SponsorRecord,
+} from "@/lib/sponsors/logic";
 
 const SHOWN_KEY = "tt_sponsor_popup_shown";
 const ROT_KEY = "tt_sponsor_popup_rot";
@@ -68,6 +72,7 @@ export default function SponsorPopup({ sponsors }: { sponsors: SponsorRecord[] }
   }, [open, close]);
 
   if (!open || !current) return null;
+  const href = sponsorSiteHref(current.site_url);
 
   return (
     <div
@@ -104,9 +109,9 @@ export default function SponsorPopup({ sponsors }: { sponsors: SponsorRecord[] }
             />
           )}
           <p className="font-semibold text-[#1F2C3F] text-center">{current.nom}</p>
-          {current.site_url && (
+          {href && (
             <a
-              href={current.site_url}
+              href={href}
               target="_blank"
               rel="noopener sponsored"
               className="inline-block bg-[#A1532D] text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-[#8a4526]"

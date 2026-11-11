@@ -134,3 +134,17 @@ Ajouter un espace publicité sponsors : admin CRUD, pop-up (une fois par visite)
 2. Créer un bucket Storage **public** nommé `sponsors` (si l’upload échoue).
 3. Fusionner la PR puis vérifier Admin → Sponsors.
 
+---
+
+# Modifications du 11/11/2026 — finition sponsors
+
+Auteur : Grok (assistant)
+
+Petit correctif après la fusion de la PR #3 (commit `7346013`). Pas de SQL, pas de variable Vercel.
+
+- `SponsorsAdmin` : le chargement de la liste ne fait plus de `setState` synchrone dans le `useEffect` (règle eslint `react-hooks/set-state-in-effect`). Le comportement reste le même : la liste se charge à l’ouverture, et après créer / modifier / supprimer.
+- `site_url` : vide autorisé. Sinon uniquement une URL `http://` ou `https://` valide (500 caractères max). L’API admin refuse le reste avec « Le lien du site doit être une URL http:// ou https:// valide. » Le pop-up et la bande n’affichent un lien que si cette validation passe (pas de `javascript:`).
+- Tests : `src/lib/sponsors/__tests__/logic.test.ts`.
+
+Les autres écrans admin qui ont le même avertissement eslint (courses, catégories, documents) n’ont pas été modifiés.
+

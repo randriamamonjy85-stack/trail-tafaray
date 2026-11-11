@@ -1,6 +1,6 @@
 "use client";
 
-import type { SponsorRecord } from "@/lib/sponsors/logic";
+import { sponsorSiteHref, type SponsorRecord } from "@/lib/sponsors/logic";
 
 export default function SponsorBanner({ sponsors }: { sponsors: SponsorRecord[] }) {
   if (!sponsors.length) return null;
@@ -23,10 +23,11 @@ export default function SponsorBanner({ sponsors }: { sponsors: SponsorRecord[] 
             ) : (
               <span className="text-sm font-medium text-stone-600">{s.nom}</span>
             );
-            return s.site_url ? (
+            const href = sponsorSiteHref(s.site_url);
+            return href ? (
               <a
                 key={s.id}
-                href={s.site_url}
+                href={href}
                 target="_blank"
                 rel="noopener sponsored"
                 className="inline-flex items-center justify-center"

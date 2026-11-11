@@ -7,6 +7,10 @@ import {
   sponsorsForBand,
   filterActiveSponsors,
   isAllowedSponsorImageType,
+  INVALID_SPONSOR_SITE_URL_MESSAGE,
+  SPONSOR_SITE_URL_MAX_LENGTH,
+  normalizeSponsorSiteUrl,
+  sponsorSiteHref,
 } from "../logic";
 
 const base = {
@@ -77,5 +81,81 @@ describe("images", () => {
   it("accepte png jpeg webp seulement", () => {
     expect(isAllowedSponsorImageType("image/png")).toBe(true);
     expect(isAllowedSponsorImageType("image/svg+xml")).toBe(false);
+  });
+});
+
+describe("site_url", () => {
+  it("autorise le vide", () => {
+    expect(normalizeSponsorSiteUrl(null)).toEqual({ ok: true, url: null });
+    expect(normalizeSponsorSiteUrl(undefined)).toEqual({ ok: true, url: null });
+    expect(normalizeSponsorSiteUrl("")).toEqual({ ok: true, url: null });
+    expect(normalizeSponsorSiteUrl("   ")).toEqual({ ok: true, url: null });
+    expect(sponsorSiteHref(null)).toBeNull();
+    expect(sponsorSiteHref("")).toBeNull();
+    expect(sponsorSiteHref("   ")).toBeNull();
+  });
+
+  it("accepte une URL http ou https", () => {
+    expect(normalizeSponsorSiteUrl("https://example.com/page?q=1")).toEqual({
+      ok: true,
+      url: "https://example.com/page?q=1",
+    });
+    expect(normalizeSponsorSiteUrl("  http://example.com/a  ")).toEqual({
+      ok: true,
+      url: "http://example.com/a",
+    });
+    expect(sponsorSiteHref("HTTPS://Example.com/a")).toBe("https://example.com/a");
+    expect(sponsorSiteHref("http://127.0.0.1:3000/x")).toBe("http://127.0.0.1:3000/x");
+  });
+
+  it("refuse les liens qui ne sont pas http(s), avec un message en français", () => {
+    const refused = [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "  javascript:alert(document.domain)",
+      "javascript://example.com/%0aalert(1)",
+      "data:text/html,hi",
+      "vbscript:msgbox(1)",
+      "file:///etc/passwd",
+      "ftp://example.com",
+      "mailto:a@b.c",
+      "//example.com",
+      "/partenaires",
+      "https:example.com",
+      "http:/example.com",
+      "http://",
+      "https://",
+      "notaurl",
+      'https://ok.com"onclick="alert(1)',
+      "https://example.com/\njavascript:alert(1)",
+      "https://example.com\\@evil.com",
+    ];
+    for (const value of refused) {
+      expect(normalizeSponsorSiteUrl(value), value).toEqual({
+        ok: false,
+        error: INVALID_SPONSOR_SITE_URL_MESSAGE,
+      });
+      const href = sponsorSiteHref(value);
+      expect(href, value).toBeNull();
+    }
+    expect(normalizeSponsorSiteUrl(123)).toEqual({
+      ok: false,
+      error: INVALID_SPONSOR_SITE_URL_MESSAGE,
+    });
+  });
+
+  it("ne rend jamais un href qui ne commence pas par http:// ou https://", () => {
+    const href = sponsorSiteHref("https://example.com/javascript:alert(1)");
+    expect(href).toMatch(/^https?:\/\//);
+    expect(href?.toLowerCase().startsWith("javascript:")).toBe(false);
+  });
+
+  it("refuse un lien plus long que la limite", () => {
+    const long = "https://example.com/" + "a".repeat(SPONSOR_SITE_URL_MAX_LENGTH);
+    expect(long.length).toBeGreaterThan(SPONSOR_SITE_URL_MAX_LENGTH);
+    expect(normalizeSponsorSiteUrl(long)).toEqual({
+      ok: false,
+      error: INVALID_SPONSOR_SITE_URL_MESSAGE,
+    });
   });
 });

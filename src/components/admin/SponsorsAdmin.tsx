@@ -29,6 +29,17 @@ const empty = {
   afficher_bande: true,
 };
 
+async function readSponsorList(): Promise<Sponsor[] | null> {
+  try {
+    const res = await fetch("/api/admin/sponsors");
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d.sponsors || [];
+  } catch {
+    return null;
+  }
+}
+
 export default function SponsorsAdmin() {
   const [list, setList] = useState<Sponsor[]>([]);
   const [form, setForm] = useState({ ...empty });
@@ -37,16 +48,19 @@ export default function SponsorsAdmin() {
   const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/sponsors");
-    if (res.ok) {
-      const d = await res.json();
-      setList(d.sponsors || []);
-    }
+    const sponsors = await readSponsorList();
+    if (sponsors !== null) setList(sponsors);
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    readSponsorList().then((sponsors) => {
+      if (!cancelled && sponsors !== null) setList(sponsors);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const upload = async (file: File) => {
     setUploading(true);

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/supabase/require-admin";
 import {
-  ALLOWED_SPONSOR_IMAGE_TYPES,
   MAX_SPONSOR_IMAGE_BYTES,
   isAllowedSponsorImageType,
+  normalizeSponsorSiteUrl,
 } from "@/lib/sponsors/logic";
 import { writeAudit } from "@/lib/audit";
 
@@ -73,10 +73,12 @@ export async function POST(request: Request) {
   if (action === "create") {
     const nom = String(body.nom || "").trim().slice(0, 120);
     if (!nom) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
+    const site = normalizeSponsorSiteUrl(body.site_url);
+    if (!site.ok) return NextResponse.json({ error: site.error }, { status: 400 });
     const row = {
       nom,
       image_url: String(body.image_url || "").slice(0, 500),
-      site_url: body.site_url ? String(body.site_url).slice(0, 500) : null,
+      site_url: site.url,
       date_debut: body.date_debut || null,
       date_fin: body.date_fin || null,
       actif: body.actif !== false,
@@ -97,7 +99,6 @@ export async function POST(request: Request) {
     for (const k of [
       "nom",
       "image_url",
-      "site_url",
       "date_debut",
       "date_fin",
       "actif",
@@ -106,6 +107,11 @@ export async function POST(request: Request) {
       "afficher_bande",
     ]) {
       if (body[k] !== undefined) patch[k] = body[k];
+    }
+    if (body.site_url !== undefined) {
+      const site = normalizeSponsorSiteUrl(body.site_url);
+      if (!site.ok) return NextResponse.json({ error: site.error }, { status: 400 });
+      patch.site_url = site.url;
     }
     if (typeof patch.nom === "string") patch.nom = patch.nom.trim().slice(0, 120);
     const { error } = await supabase.from("sponsors").update(patch).eq("id", id);

@@ -93,3 +93,63 @@ export const ALLOWED_SPONSOR_IMAGE_TYPES = [
 export function isAllowedSponsorImageType(mime: string): boolean {
   return (ALLOWED_SPONSOR_IMAGE_TYPES as readonly string[]).includes(mime);
 }
+
+/** Longueur max stockée pour site_url (l’API refuse au-delà, sans couper). */
+export const SPONSOR_SITE_URL_MAX_LENGTH = 500;
+
+export const INVALID_SPONSOR_SITE_URL_MESSAGE =
+  "Le lien du site doit être une URL http:// ou https:// valide.";
+
+/**
+ * URL http(s) explicite. Vide n'est pas traité ici.
+ * Refuse javascript:, data:, les schémas sans //, et les caractères
+ * que le parseur URL réécrit (contrôles, espaces, guillemets, antislash).
+ */
+function parsedSponsorHttpUrl(value: string): URL | null {
+  if (!value || value.length > 2048) return null;
+  if (!/^https?:\/\//i.test(value)) return null;
+  if (/[\u0000-\u001F\u007F]/.test(value) || /\s/u.test(value)) return null;
+  if (/["'<>\\]/.test(value)) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (!url.hostname) return null;
+  if (!/^https?:\/\//i.test(url.href)) return null;
+  return url;
+}
+
+/**
+ * Valeur admin : null / absent / chaîne vide = pas de lien.
+ * Sinon uniquement une URL http:// ou https:// (max 500 caractères).
+ */
+export function normalizeSponsorSiteUrl(
+  value: unknown
+): { ok: true; url: string | null } | { ok: false; error: string } {
+  if (value == null) return { ok: true, url: null };
+  if (typeof value !== "string") {
+    return { ok: false, error: INVALID_SPONSOR_SITE_URL_MESSAGE };
+  }
+  const trimmed = value.trim();
+  if (trimmed === "") return { ok: true, url: null };
+  if (trimmed.length > SPONSOR_SITE_URL_MAX_LENGTH || parsedSponsorHttpUrl(trimmed) === null) {
+    return { ok: false, error: INVALID_SPONSOR_SITE_URL_MESSAGE };
+  }
+  return { ok: true, url: trimmed };
+}
+
+/**
+ * Href à rendre dans le pop-up / la bande.
+ * null si vide ou si le lien n'est pas http(s) (ex. javascript:).
+ * Renvoie l'URL normalisée par le parseur, jamais la chaîne brute.
+ */
+export function sponsorSiteHref(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const url = parsedSponsorHttpUrl(trimmed);
+  return url ? url.href : null;
+}

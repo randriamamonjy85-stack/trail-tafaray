@@ -1,0 +1,1190 @@
+From fd7e8597df25fb905f4c9b1ae3543c8f8d3e1f44 Mon Sep 17 00:00:00 2001
+From: Trail Tafaray Dev <trail-tafaray-bot@users.noreply.github.com>
+Date: Wed, 11 Nov 2026 12:59:35 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20espace=20publicit=C3=A9=20sponsors=20(a?=
+ =?UTF-8?q?dmin,=20pop-up,=20bande,=20compteurs)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Table sponsors + RLS + RPC compteurs (migration non exécutée)
+- Admin Sponsors (CRUD, upload PNG/JPG/WebP, dates, pop-up/bande)
+- Pop-up une fois par visite + rotation ; exclus inscription/admin/certificat
+- Bande de logos en bas des pages publiques
+- Compteurs vues/clics anonymes via API
+- Tests unitaires logique dates/rotation/pages exclues
+---
+ docs/MODIFICATIONS-GROK-BOT.md             |  40 +++
+ package.json                               |   3 +-
+ src/app/admin/page.tsx                     |   6 +-
+ src/app/api/admin/sponsors/route.ts        | 127 +++++++++
+ src/app/api/sponsors/route.ts              |  29 ++
+ src/app/api/sponsors/track/route.ts        |  41 +++
+ src/app/layout.tsx                         |   2 +
+ src/components/admin/SponsorsAdmin.tsx     | 295 +++++++++++++++++++++
+ src/components/sponsors/SponsorBanner.tsx  |  53 ++++
+ src/components/sponsors/SponsorPopup.tsx   | 128 +++++++++
+ src/components/sponsors/SponsorsPublic.tsx |  41 +++
+ src/lib/sponsors/__tests__/logic.test.ts   |  81 ++++++
+ src/lib/sponsors/logic.ts                  |  95 +++++++
+ supabase/migrate_sponsors.sql              |  75 ++++++
+ 14 files changed, 1014 insertions(+), 2 deletions(-)
+ create mode 100644 src/app/api/admin/sponsors/route.ts
+ create mode 100644 src/app/api/sponsors/route.ts
+ create mode 100644 src/app/api/sponsors/track/route.ts
+ create mode 100644 src/components/admin/SponsorsAdmin.tsx
+ create mode 100644 src/components/sponsors/SponsorBanner.tsx
+ create mode 100644 src/components/sponsors/SponsorPopup.tsx
+ create mode 100644 src/components/sponsors/SponsorsPublic.tsx
+ create mode 100644 src/lib/sponsors/__tests__/logic.test.ts
+ create mode 100644 src/lib/sponsors/logic.ts
+ create mode 100644 supabase/migrate_sponsors.sql
+
+diff --git a/docs/MODIFICATIONS-GROK-BOT.md b/docs/MODIFICATIONS-GROK-BOT.md
+index 21a7bd3..20b9865 100644
+--- a/docs/MODIFICATIONS-GROK-BOT.md
++++ b/docs/MODIFICATIONS-GROK-BOT.md
+@@ -94,3 +94,43 @@ Aucun nouveau service payant. Pas de clé à ajouter pour les polices ou la limi
+ - Le fond, les polices et le PDF de référence restent dans le bucket privé. Pas de bucket public pour ces fichiers.
+ - Pas de liste publique des coureurs. Chacun retrouve son certificat avec édition + dossard + nom.
+ - Ne pas montrer de secret, de clé `service_role`, ni de donnée réelle de coureur dans les exemples, les tests ou les captures.
++
++---
++
++# Modifications du 11/11/2026 — Espace publicité sponsors
++
++Auteur : Grok (assistant)
++
++## Objectif
++
++Ajouter un espace publicité sponsors : admin CRUD, pop-up (une fois par visite), bande de logos, compteurs anonymes (vues / clics). Sans toucher aux inscriptions, export CSV 20 colonnes, certificats ni à la sécurité admin existante.
++
++## Fichiers ajoutés
++
++- `supabase/migrate_sponsors.sql` — table `sponsors`, RLS lecture publique limitée, fonction `increment_sponsor_stat` (security definer). **Non exécuté dans cette PR.**
++- `src/lib/sponsors/logic.ts` — dates actives, pages exclues, rotation, types d’image autorisés.
++- `src/lib/sponsors/__tests__/logic.test.ts` — tests unitaires.
++- `src/app/api/sponsors/route.ts` — GET liste publique.
++- `src/app/api/sponsors/track/route.ts` — POST vue/clic via RPC (rate-limit, pas d’IP stockée).
++- `src/app/api/admin/sponsors/route.ts` — CRUD + upload image (ADMIN_EMAILS / requireAdminSession).
++- `src/components/admin/SponsorsAdmin.tsx` — interface admin.
++- `src/components/sponsors/SponsorsPublic.tsx`, `SponsorPopup.tsx`, `SponsorBanner.tsx` — affichage public.
++
++## Fichiers modifiés
++
++- `src/app/layout.tsx` — `SponsorsPublic` (pop-up + bande ; exclus inscription / admin / certificat).
++- `src/app/admin/page.tsx` — onglet **Sponsors**.
++- `package.json` — script `test:sponsors`.
++
++## Ce qui n’a pas changé
++
++- Certificats, polices PDF, buckets privés, ADMIN_EMAILS strict.
++- Export TMH 20 colonnes.
++- Migrations certificats déjà exécutées : non relancées / non modifiées.
++
++## Pour Hoby avant / après fusion
++
++1. Exécuter `supabase/migrate_sponsors.sql` dans Supabase SQL.
++2. Créer un bucket Storage **public** nommé `sponsors` (si l’upload échoue).
++3. Fusionner la PR puis vérifier Admin → Sponsors.
++
+diff --git a/package.json b/package.json
+index af8d6bf..2c87cf6 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,8 @@
+     "start": "next start",
+     "lint": "eslint",
+     "test": "vitest run",
+-    "test:certificats": "vitest run src/lib/certificats"
++    "test:certificats": "vitest run src/lib/certificats",
++    "test:sponsors": "vitest run src/lib/sponsors"
+   },
+   "dependencies": {
+     "@pdf-lib/fontkit": "^1.1.1",
+diff --git a/src/app/admin/page.tsx b/src/app/admin/page.tsx
+index debf1fb..c2f82d0 100644
+--- a/src/app/admin/page.tsx
++++ b/src/app/admin/page.tsx
+@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
+ import { createClient } from "@/lib/supabase/client";
+ import { COURSES } from "@/lib/types";
+ import CertificatsAdmin from "@/components/admin/CertificatsAdmin";
++import SponsorsAdmin from "@/components/admin/SponsorsAdmin";
+ import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
+ import CoursesAdmin from "@/components/admin/CoursesAdmin";
+ import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
+@@ -24,7 +25,8 @@ type Tab =
+   | "documents"
+   | "audit"
+   | "footer"
+-  | "certificats";
++  | "certificats"
++  | "sponsors";
+ 
+ type Inscription = {
+   id: string;
+@@ -505,6 +507,7 @@ export default function AdminPage() {
+         { id: "contenu", label: "Textes & accueil", icon: "✏️" },
+         { id: "visibilite", label: "Visibilité modules", icon: "👁️" },
+         { id: "partenaires", label: "Partenaires", icon: "🤝" },
++        { id: "sponsors", label: "Sponsors", icon: "📢" },
+         { id: "actualites", label: "Actualités", icon: "📰" },
+         { id: "photos", label: "Photos", icon: "🖼️" },
+         { id: "documents", label: "Documents", icon: "📄" },
+@@ -1383,6 +1386,7 @@ export default function AdminPage() {
+       )}
+       {tab === "courses" && <CoursesAdmin />}
+       {tab === "certificats" && <CertificatsAdmin />}
++      {tab === "sponsors" && <SponsorsAdmin />}
+ 
+       {tab === "resultats" && (
+         <div className="space-y-4">
+diff --git a/src/app/api/admin/sponsors/route.ts b/src/app/api/admin/sponsors/route.ts
+new file mode 100644
+index 0000000..ac80b27
+--- /dev/null
++++ b/src/app/api/admin/sponsors/route.ts
+@@ -0,0 +1,127 @@
++import { NextResponse } from "next/server";
++import { requireAdminSession } from "@/lib/supabase/require-admin";
++import {
++  ALLOWED_SPONSOR_IMAGE_TYPES,
++  MAX_SPONSOR_IMAGE_BYTES,
++  isAllowedSponsorImageType,
++} from "@/lib/sponsors/logic";
++import { writeAudit } from "@/lib/audit";
++
++export const runtime = "nodejs";
++
++export async function GET() {
++  const gate = await requireAdminSession();
++  if (gate.response) return gate.response;
++  const { data, error } = await gate.admin!
++    .from("sponsors")
++    .select("*")
++    .order("ordre", { ascending: true });
++  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++  return NextResponse.json({ sponsors: data || [] });
++}
++
++export async function POST(request: Request) {
++  const gate = await requireAdminSession();
++  if (gate.response) return gate.response;
++  const supabase = gate.admin!;
++  const ctype = request.headers.get("content-type") || "";
++
++  if (ctype.includes("multipart/form-data")) {
++    const form = await request.formData();
++    const action = String(form.get("action") || "create");
++    const file = form.get("file") as File | null;
++
++    if (action === "upload_image") {
++      if (!file) return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
++      if (!isAllowedSponsorImageType(file.type)) {
++        return NextResponse.json(
++          { error: "Formats acceptés : PNG, JPG, WebP (pas de SVG)." },
++          { status: 400 }
++        );
++      }
++      if (file.size > MAX_SPONSOR_IMAGE_BYTES) {
++        return NextResponse.json({ error: "Image trop grande (max 2 Mo)." }, { status: 400 });
++      }
++      const ext =
++        file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
++      const path = `sponsors/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
++      const bytes = new Uint8Array(await file.arrayBuffer());
++      const { error } = await supabase.storage.from("sponsors").upload(path, bytes, {
++        contentType: file.type,
++        upsert: false,
++      });
++      if (error) {
++        return NextResponse.json(
++          {
++            error:
++              error.message +
++              " — Créez le bucket public « sponsors » dans Supabase Storage si besoin.",
++          },
++          { status: 500 }
++        );
++      }
++      const { data: pub } = supabase.storage.from("sponsors").getPublicUrl(path);
++      return NextResponse.json({ url: pub.publicUrl, path });
++    }
++
++    return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
++  }
++
++  const body = await request.json();
++  const action = body.action as string;
++
++  if (action === "create") {
++    const nom = String(body.nom || "").trim().slice(0, 120);
++    if (!nom) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
++    const row = {
++      nom,
++      image_url: String(body.image_url || "").slice(0, 500),
++      site_url: body.site_url ? String(body.site_url).slice(0, 500) : null,
++      date_debut: body.date_debut || null,
++      date_fin: body.date_fin || null,
++      actif: body.actif !== false,
++      ordre: Number(body.ordre) || 0,
++      afficher_popup: !!body.afficher_popup,
++      afficher_bande: body.afficher_bande !== false,
++    };
++    const { data, error } = await supabase.from("sponsors").insert(row).select("*").single();
++    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++    await writeAudit(supabase, gate.user?.email, "sponsor_create", "sponsor", data.id);
++    return NextResponse.json({ sponsor: data });
++  }
++
++  if (action === "update") {
++    const id = String(body.id || "");
++    if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
++    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
++    for (const k of [
++      "nom",
++      "image_url",
++      "site_url",
++      "date_debut",
++      "date_fin",
++      "actif",
++      "ordre",
++      "afficher_popup",
++      "afficher_bande",
++    ]) {
++      if (body[k] !== undefined) patch[k] = body[k];
++    }
++    if (typeof patch.nom === "string") patch.nom = patch.nom.trim().slice(0, 120);
++    const { error } = await supabase.from("sponsors").update(patch).eq("id", id);
++    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++    await writeAudit(supabase, gate.user?.email, "sponsor_update", "sponsor", id);
++    return NextResponse.json({ success: true });
++  }
++
++  if (action === "delete") {
++    const id = String(body.id || "");
++    if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
++    const { error } = await supabase.from("sponsors").delete().eq("id", id);
++    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++    await writeAudit(supabase, gate.user?.email, "sponsor_delete", "sponsor", id);
++    return NextResponse.json({ success: true });
++  }
++
++  return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
++}
+diff --git a/src/app/api/sponsors/route.ts b/src/app/api/sponsors/route.ts
+new file mode 100644
+index 0000000..ba2d3b7
+--- /dev/null
++++ b/src/app/api/sponsors/route.ts
+@@ -0,0 +1,29 @@
++import { NextResponse } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import {
++  filterActiveSponsors,
++  type SponsorRecord,
++} from "@/lib/sponsors/logic";
++
++/** Liste publique des sponsors actifs (RLS + filtre dates côté code). */
++export async function GET() {
++  try {
++    const supabase = await createClient();
++    const { data, error } = await supabase
++      .from("sponsors")
++      .select(
++        "id,nom,image_url,site_url,date_debut,date_fin,actif,ordre,afficher_popup,afficher_bande"
++      )
++      .order("ordre", { ascending: true });
++
++    if (error) {
++      // Table absente avant migration : réponse vide plutôt qu'erreur 500
++      return NextResponse.json({ sponsors: [] as SponsorRecord[] });
++    }
++
++    const sponsors = filterActiveSponsors((data || []) as SponsorRecord[]);
++    return NextResponse.json({ sponsors });
++  } catch {
++    return NextResponse.json({ sponsors: [] });
++  }
++}
+diff --git a/src/app/api/sponsors/track/route.ts b/src/app/api/sponsors/track/route.ts
+new file mode 100644
+index 0000000..946e847
+--- /dev/null
++++ b/src/app/api/sponsors/track/route.ts
+@@ -0,0 +1,41 @@
++import { NextResponse } from "next/server";
++import { createClient } from "@/lib/supabase/server";
++import { rateLimit } from "@/lib/rate-limit";
++
++export async function POST(request: Request) {
++  const ip =
++    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
++    request.headers.get("x-real-ip") ||
++    "unknown";
++  const rl = rateLimit(`sponsor-track:${ip}`, 30, 60_000);
++  if (!rl.ok) {
++    return NextResponse.json({ ok: false }, { status: 429 });
++  }
++
++  let body: { id?: string; kind?: string } = {};
++  try {
++    body = await request.json();
++  } catch {
++    return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
++  }
++
++  const id = String(body.id || "");
++  const kind = String(body.kind || "");
++  if (!id || (kind !== "view" && kind !== "click")) {
++    return NextResponse.json({ error: "Paramètres invalides" }, { status: 400 });
++  }
++
++  try {
++    const supabase = await createClient();
++    const { error } = await supabase.rpc("increment_sponsor_stat", {
++      p_id: id,
++      p_kind: kind,
++    });
++    if (error) {
++      return NextResponse.json({ ok: false }, { status: 200 });
++    }
++    return NextResponse.json({ ok: true });
++  } catch {
++    return NextResponse.json({ ok: false }, { status: 200 });
++  }
++}
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 3494892..424a4b0 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -4,6 +4,7 @@ import "./globals.css";
+ import Image from "next/image";
+ import SiteFooter from "@/components/SiteFooter";
+ import SiteHeader from "@/components/SiteHeader";
++import SponsorsPublic from "@/components/sponsors/SponsorsPublic";
+ 
+ const inter = Inter({
+   subsets: ["latin"],
+@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode })
+       <body className="min-h-full flex flex-col bg-stone-50 text-stone-900 antialiased">
+         <SiteHeader />
+         <main className="flex-1">{children}</main>
++        <SponsorsPublic />
+         <SiteFooter />
+       </body>
+     </html>
+diff --git a/src/components/admin/SponsorsAdmin.tsx b/src/components/admin/SponsorsAdmin.tsx
+new file mode 100644
+index 0000000..0052611
+--- /dev/null
++++ b/src/components/admin/SponsorsAdmin.tsx
+@@ -0,0 +1,295 @@
++"use client";
++
++import { useCallback, useEffect, useState } from "react";
++
++type Sponsor = {
++  id: string;
++  nom: string;
++  image_url: string;
++  site_url?: string | null;
++  date_debut?: string | null;
++  date_fin?: string | null;
++  actif: boolean;
++  ordre: number;
++  afficher_popup: boolean;
++  afficher_bande: boolean;
++  vues: number;
++  clics: number;
++};
++
++const empty = {
++  nom: "",
++  image_url: "",
++  site_url: "",
++  date_debut: "",
++  date_fin: "",
++  actif: true,
++  ordre: 0,
++  afficher_popup: false,
++  afficher_bande: true,
++};
++
++export default function SponsorsAdmin() {
++  const [list, setList] = useState<Sponsor[]>([]);
++  const [form, setForm] = useState({ ...empty });
++  const [editId, setEditId] = useState<string | null>(null);
++  const [msg, setMsg] = useState("");
++  const [uploading, setUploading] = useState(false);
++
++  const load = useCallback(async () => {
++    const res = await fetch("/api/admin/sponsors");
++    if (res.ok) {
++      const d = await res.json();
++      setList(d.sponsors || []);
++    }
++  }, []);
++
++  useEffect(() => {
++    load();
++  }, [load]);
++
++  const upload = async (file: File) => {
++    setUploading(true);
++    setMsg("");
++    const fd = new FormData();
++    fd.set("action", "upload_image");
++    fd.set("file", file);
++    const res = await fetch("/api/admin/sponsors", { method: "POST", body: fd });
++    const d = await res.json();
++    setUploading(false);
++    if (!res.ok) {
++      setMsg(d.error || "Erreur upload");
++      return;
++    }
++    setForm((f) => ({ ...f, image_url: d.url }));
++    setMsg("Image enregistrée");
++  };
++
++  const save = async () => {
++    setMsg("");
++    if (!form.nom.trim()) {
++      setMsg("Le nom est obligatoire");
++      return;
++    }
++    const body = editId
++      ? { action: "update", id: editId, ...form }
++      : { action: "create", ...form };
++    const res = await fetch("/api/admin/sponsors", {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify(body),
++    });
++    const d = await res.json();
++    if (!res.ok) {
++      setMsg(d.error || "Erreur");
++      return;
++    }
++    setMsg(editId ? "Sponsor mis à jour" : "Sponsor créé");
++    setForm({ ...empty });
++    setEditId(null);
++    await load();
++  };
++
++  const startEdit = (s: Sponsor) => {
++    setEditId(s.id);
++    setForm({
++      nom: s.nom,
++      image_url: s.image_url || "",
++      site_url: s.site_url || "",
++      date_debut: s.date_debut ? String(s.date_debut).slice(0, 10) : "",
++      date_fin: s.date_fin ? String(s.date_fin).slice(0, 10) : "",
++      actif: s.actif,
++      ordre: s.ordre,
++      afficher_popup: s.afficher_popup,
++      afficher_bande: s.afficher_bande,
++    });
++  };
++
++  return (
++    <div className="space-y-8">
++      <div>
++        <h2 className="text-xl font-bold text-[#1F2C3F]">Sponsors (publicité)</h2>
++        <p className="text-sm text-stone-600 mt-1">
++          Pop-up (une fois par visite) et bande de logos en bas des pages publiques. Compteurs
++          anonymes uniquement.
++        </p>
++      </div>
++
++      {msg && (
++        <div className="text-sm bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">{msg}</div>
++      )}
++
++      <section className="border border-stone-200 rounded-2xl p-5 space-y-3 max-w-xl">
++        <h3 className="font-semibold">{editId ? "Modifier" : "Ajouter"} un sponsor</h3>
++        <input
++          className="w-full border rounded-lg px-3 py-2 text-sm"
++          placeholder="Nom *"
++          value={form.nom}
++          onChange={(e) => setForm({ ...form, nom: e.target.value })}
++        />
++        <input
++          className="w-full border rounded-lg px-3 py-2 text-sm"
++          placeholder="Lien site (https://…)"
++          value={form.site_url}
++          onChange={(e) => setForm({ ...form, site_url: e.target.value })}
++        />
++        <div>
++          <label className="text-xs text-stone-500">Image PNG / JPG / WebP (max 2 Mo)</label>
++          <input
++            type="file"
++            accept="image/png,image/jpeg,image/webp"
++            className="block mt-1 text-sm"
++            onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
++          />
++          {form.image_url && (
++            // eslint-disable-next-line @next/next/no-img-element
++            <img src={form.image_url} alt="" className="mt-2 max-h-16 object-contain" />
++          )}
++          {uploading && <p className="text-xs text-stone-500">Upload…</p>}
++        </div>
++        <div className="grid grid-cols-2 gap-2">
++          <div>
++            <label className="text-xs">Début</label>
++            <input
++              type="date"
++              className="w-full border rounded-lg px-2 py-2 text-sm"
++              value={form.date_debut}
++              onChange={(e) => setForm({ ...form, date_debut: e.target.value })}
++            />
++          </div>
++          <div>
++            <label className="text-xs">Fin</label>
++            <input
++              type="date"
++              className="w-full border rounded-lg px-2 py-2 text-sm"
++              value={form.date_fin}
++              onChange={(e) => setForm({ ...form, date_fin: e.target.value })}
++            />
++          </div>
++        </div>
++        <div>
++          <label className="text-xs">Ordre d&apos;affichage</label>
++          <input
++            type="number"
++            className="w-full border rounded-lg px-3 py-2 text-sm"
++            value={form.ordre}
++            onChange={(e) => setForm({ ...form, ordre: Number(e.target.value) })}
++          />
++        </div>
++        <label className="flex items-center gap-2 text-sm">
++          <input
++            type="checkbox"
++            checked={form.actif}
++            onChange={(e) => setForm({ ...form, actif: e.target.checked })}
++          />
++          Actif
++        </label>
++        <label className="flex items-center gap-2 text-sm">
++          <input
++            type="checkbox"
++            checked={form.afficher_popup}
++            onChange={(e) => setForm({ ...form, afficher_popup: e.target.checked })}
++          />
++          Afficher en pop-up
++        </label>
++        <label className="flex items-center gap-2 text-sm">
++          <input
++            type="checkbox"
++            checked={form.afficher_bande}
++            onChange={(e) => setForm({ ...form, afficher_bande: e.target.checked })}
++          />
++          Afficher dans la bande de logos
++        </label>
++        <div className="flex gap-2">
++          <button
++            type="button"
++            onClick={save}
++            className="bg-[#1F2C3F] text-white px-5 py-2 rounded-full text-sm font-medium"
++          >
++            {editId ? "Enregistrer" : "Créer"}
++          </button>
++          {editId && (
++            <button
++              type="button"
++              className="border px-4 py-2 rounded-full text-sm"
++              onClick={() => {
++                setEditId(null);
++                setForm({ ...empty });
++              }}
++            >
++              Annuler
++            </button>
++          )}
++        </div>
++      </section>
++
++      <section className="space-y-3">
++        <h3 className="font-semibold text-[#1F2C3F]">Liste ({list.length})</h3>
++        {list.length === 0 && (
++          <p className="text-sm text-stone-500">Aucun sponsor. Créez-en un ci-dessus.</p>
++        )}
++        {list.map((s) => (
++          <div
++            key={s.id}
++            className="bg-white border border-stone-200 rounded-xl p-4 flex flex-wrap gap-4 items-center justify-between"
++          >
++            <div className="flex items-center gap-3 min-w-0">
++              {s.image_url ? (
++                // eslint-disable-next-line @next/next/no-img-element
++                <img src={s.image_url} alt="" className="h-10 w-16 object-contain" />
++              ) : (
++                <div className="h-10 w-16 bg-stone-100 rounded" />
++              )}
++              <div className="min-w-0">
++                <p className="font-medium truncate">
++                  {s.nom}{" "}
++                  {!s.actif && (
++                    <span className="text-xs text-stone-400">(désactivé)</span>
++                  )}
++                </p>
++                <p className="text-xs text-stone-500">
++                  Ordre {s.ordre} · Pop-up {s.afficher_popup ? "oui" : "non"} · Bande{" "}
++                  {s.afficher_bande ? "oui" : "non"} · Vues {s.vues ?? 0} · Clics {s.clics ?? 0}
++                </p>
++              </div>
++            </div>
++            <div className="flex gap-2 text-sm">
++              <button type="button" className="text-blue-700" onClick={() => startEdit(s)}>
++                Modifier
++              </button>
++              <button
++                type="button"
++                className="text-stone-600"
++                onClick={async () => {
++                  await fetch("/api/admin/sponsors", {
++                    method: "POST",
++                    headers: { "Content-Type": "application/json" },
++                    body: JSON.stringify({ action: "update", id: s.id, actif: !s.actif }),
++                  });
++                  await load();
++                }}
++              >
++                {s.actif ? "Désactiver" : "Activer"}
++              </button>
++              <button
++                type="button"
++                className="text-red-700"
++                onClick={async () => {
++                  if (!confirm("Supprimer ce sponsor ?")) return;
++                  await fetch("/api/admin/sponsors", {
++                    method: "POST",
++                    headers: { "Content-Type": "application/json" },
++                    body: JSON.stringify({ action: "delete", id: s.id }),
++                  });
++                  await load();
++                }}
++              >
++                Supprimer
++              </button>
++            </div>
++          </div>
++        ))}
++      </section>
++    </div>
++  );
++}
+diff --git a/src/components/sponsors/SponsorBanner.tsx b/src/components/sponsors/SponsorBanner.tsx
+new file mode 100644
+index 0000000..fba2ea4
+--- /dev/null
++++ b/src/components/sponsors/SponsorBanner.tsx
+@@ -0,0 +1,53 @@
++"use client";
++
++import type { SponsorRecord } from "@/lib/sponsors/logic";
++
++export default function SponsorBanner({ sponsors }: { sponsors: SponsorRecord[] }) {
++  if (!sponsors.length) return null;
++
++  return (
++    <div className="border-t border-stone-200 bg-white">
++      <div className="max-w-6xl mx-auto px-4 py-4">
++        <p className="text-[10px] uppercase tracking-widest text-stone-400 text-center mb-3">
++          Nos sponsors
++        </p>
++        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
++          {sponsors.map((s) => {
++            const inner = s.image_url ? (
++              // eslint-disable-next-line @next/next/no-img-element
++              <img
++                src={s.image_url}
++                alt={s.nom}
++                className="max-h-10 sm:max-h-12 max-w-[120px] object-contain opacity-90 hover:opacity-100 transition"
++              />
++            ) : (
++              <span className="text-sm font-medium text-stone-600">{s.nom}</span>
++            );
++            return s.site_url ? (
++              <a
++                key={s.id}
++                href={s.site_url}
++                target="_blank"
++                rel="noopener sponsored"
++                className="inline-flex items-center justify-center"
++                onClick={() => {
++                  fetch("/api/sponsors/track", {
++                    method: "POST",
++                    headers: { "Content-Type": "application/json" },
++                    body: JSON.stringify({ id: s.id, kind: "click" }),
++                  }).catch(() => {});
++                }}
++              >
++                {inner}
++              </a>
++            ) : (
++              <div key={s.id} className="inline-flex">
++                {inner}
++              </div>
++            );
++          })}
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/sponsors/SponsorPopup.tsx b/src/components/sponsors/SponsorPopup.tsx
+new file mode 100644
+index 0000000..b4b9c8b
+--- /dev/null
++++ b/src/components/sponsors/SponsorPopup.tsx
+@@ -0,0 +1,128 @@
++"use client";
++
++import { useCallback, useEffect, useRef, useState } from "react";
++import type { SponsorRecord } from "@/lib/sponsors/logic";
++import { pickRotatedSponsor, sponsorsForPopup } from "@/lib/sponsors/logic";
++
++const SHOWN_KEY = "tt_sponsor_popup_shown";
++const ROT_KEY = "tt_sponsor_popup_rot";
++
++export default function SponsorPopup({ sponsors }: { sponsors: SponsorRecord[] }) {
++  const [open, setOpen] = useState(false);
++  const [current, setCurrent] = useState<SponsorRecord | null>(null);
++  const closeBtnRef = useRef<HTMLButtonElement>(null);
++
++  const close = useCallback(() => {
++    setOpen(false);
++    try {
++      sessionStorage.setItem(SHOWN_KEY, "1");
++    } catch {
++      /* ignore */
++    }
++  }, []);
++
++  useEffect(() => {
++    try {
++      if (sessionStorage.getItem(SHOWN_KEY) === "1") return;
++    } catch {
++      /* ignore */
++    }
++    const candidates = sponsorsForPopup(sponsors);
++    if (!candidates.length) return;
++
++    let rot = 0;
++    try {
++      rot = parseInt(sessionStorage.getItem(ROT_KEY) || "0", 10) || 0;
++    } catch {
++      rot = 0;
++    }
++    const picked = pickRotatedSponsor(candidates, rot);
++    if (!picked) return;
++
++    const t = window.setTimeout(() => {
++      setCurrent(picked);
++      setOpen(true);
++      try {
++        sessionStorage.setItem(ROT_KEY, String(rot + 1));
++      } catch {
++        /* ignore */
++      }
++      fetch("/api/sponsors/track", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ id: picked.id, kind: "view" }),
++      }).catch(() => {});
++    }, 2500);
++
++    return () => window.clearTimeout(t);
++  }, [sponsors]);
++
++  useEffect(() => {
++    if (!open) return;
++    closeBtnRef.current?.focus();
++    const onKey = (e: KeyboardEvent) => {
++      if (e.key === "Escape") close();
++    };
++    window.addEventListener("keydown", onKey);
++    return () => window.removeEventListener("keydown", onKey);
++  }, [open, close]);
++
++  if (!open || !current) return null;
++
++  return (
++    <div
++      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-3 sm:p-6"
++      role="dialog"
++      aria-modal="true"
++      aria-label={`Publicité ${current.nom}`}
++    >
++      <button
++        type="button"
++        className="absolute inset-0 bg-black/40"
++        aria-label="Fermer la publicité"
++        onClick={close}
++      />
++      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
++        <div className="flex justify-between items-center px-4 py-2 border-b border-stone-100">
++          <span className="text-xs text-stone-500">Sponsor</span>
++          <button
++            ref={closeBtnRef}
++            type="button"
++            onClick={close}
++            className="text-sm font-medium text-stone-700 hover:text-[#1F2C3F] px-2 py-1 rounded-lg"
++          >
++            Fermer ✕
++          </button>
++        </div>
++        <div className="p-4 flex flex-col items-center gap-3">
++          {current.image_url && (
++            // eslint-disable-next-line @next/next/no-img-element
++            <img
++              src={current.image_url}
++              alt={current.nom}
++              className="max-h-28 object-contain"
++            />
++          )}
++          <p className="font-semibold text-[#1F2C3F] text-center">{current.nom}</p>
++          {current.site_url && (
++            <a
++              href={current.site_url}
++              target="_blank"
++              rel="noopener sponsored"
++              className="inline-block bg-[#A1532D] text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-[#8a4526]"
++              onClick={() => {
++                fetch("/api/sponsors/track", {
++                  method: "POST",
++                  headers: { "Content-Type": "application/json" },
++                  body: JSON.stringify({ id: current.id, kind: "click" }),
++                }).catch(() => {});
++              }}
++            >
++              Découvrir
++            </a>
++          )}
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/sponsors/SponsorsPublic.tsx b/src/components/sponsors/SponsorsPublic.tsx
+new file mode 100644
+index 0000000..77830b7
+--- /dev/null
++++ b/src/components/sponsors/SponsorsPublic.tsx
+@@ -0,0 +1,41 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { usePathname } from "next/navigation";
++import {
++  isSponsorExcludedPath,
++  sponsorsForBand,
++  type SponsorRecord,
++} from "@/lib/sponsors/logic";
++import SponsorBanner from "./SponsorBanner";
++import SponsorPopup from "./SponsorPopup";
++
++export default function SponsorsPublic() {
++  const pathname = usePathname() || "/";
++  const [sponsors, setSponsors] = useState<SponsorRecord[]>([]);
++
++  useEffect(() => {
++    if (isSponsorExcludedPath(pathname)) return;
++    let cancelled = false;
++    fetch("/api/sponsors")
++      .then((r) => r.json())
++      .then((d) => {
++        if (!cancelled) setSponsors(d.sponsors || []);
++      })
++      .catch(() => {});
++    return () => {
++      cancelled = true;
++    };
++  }, [pathname]);
++
++  if (isSponsorExcludedPath(pathname)) return null;
++
++  const band = sponsorsForBand(sponsors);
++
++  return (
++    <>
++      <SponsorPopup sponsors={sponsors} />
++      <SponsorBanner sponsors={band} />
++    </>
++  );
++}
+diff --git a/src/lib/sponsors/__tests__/logic.test.ts b/src/lib/sponsors/__tests__/logic.test.ts
+new file mode 100644
+index 0000000..0f0d763
+--- /dev/null
++++ b/src/lib/sponsors/__tests__/logic.test.ts
+@@ -0,0 +1,81 @@
++import { describe, it, expect } from "vitest";
++import {
++  isSponsorActiveOn,
++  isSponsorExcludedPath,
++  pickRotatedSponsor,
++  sponsorsForPopup,
++  sponsorsForBand,
++  filterActiveSponsors,
++  isAllowedSponsorImageType,
++} from "../logic";
++
++const base = {
++  id: "1",
++  nom: "Acme",
++  image_url: "https://example.com/a.png",
++  actif: true,
++  ordre: 0,
++  afficher_popup: true,
++  afficher_bande: true,
++};
++
++describe("isSponsorExcludedPath", () => {
++  it("exclut inscription, admin, certificat", () => {
++    expect(isSponsorExcludedPath("/inscription")).toBe(true);
++    expect(isSponsorExcludedPath("/inscription?course=x")).toBe(true);
++    expect(isSponsorExcludedPath("/admin")).toBe(true);
++    expect(isSponsorExcludedPath("/admin/foo")).toBe(true);
++    expect(isSponsorExcludedPath("/certificat")).toBe(true);
++  });
++  it("autorise l'accueil et partenaires", () => {
++    expect(isSponsorExcludedPath("/")).toBe(false);
++    expect(isSponsorExcludedPath("/partenaires")).toBe(false);
++    expect(isSponsorExcludedPath("/courses")).toBe(false);
++  });
++});
++
++describe("isSponsorActiveOn", () => {
++  const day = new Date(Date.UTC(2026, 10, 11)); // 11 nov 2026
++  it("respecte actif=false", () => {
++    expect(isSponsorActiveOn({ ...base, actif: false }, day)).toBe(false);
++  });
++  it("respecte date_debut / date_fin", () => {
++    expect(
++      isSponsorActiveOn({ ...base, date_debut: "2026-11-12", date_fin: null }, day)
++    ).toBe(false);
++    expect(
++      isSponsorActiveOn({ ...base, date_debut: "2026-11-01", date_fin: "2026-11-11" }, day)
++    ).toBe(true);
++    expect(
++      isSponsorActiveOn({ ...base, date_debut: null, date_fin: "2026-11-10" }, day)
++    ).toBe(false);
++  });
++});
++
++describe("rotation et filtres", () => {
++  const list = [
++    { ...base, id: "a", ordre: 1, afficher_popup: true, afficher_bande: false },
++    { ...base, id: "b", ordre: 0, afficher_popup: true, afficher_bande: true },
++    { ...base, id: "c", ordre: 2, afficher_popup: false, afficher_bande: true },
++  ];
++  it("ordonne et filtre", () => {
++    const act = filterActiveSponsors(list);
++    expect(act.map((s) => s.id)).toEqual(["b", "a", "c"]);
++    expect(sponsorsForPopup(list).map((s) => s.id)).toEqual(["b", "a"]);
++    expect(sponsorsForBand(list).map((s) => s.id)).toEqual(["b", "c"]);
++  });
++  it("rotation cyclique", () => {
++    const pop = sponsorsForPopup(list);
++    expect(pickRotatedSponsor(pop, 0)?.id).toBe("b");
++    expect(pickRotatedSponsor(pop, 1)?.id).toBe("a");
++    expect(pickRotatedSponsor(pop, 2)?.id).toBe("b");
++    expect(pickRotatedSponsor([], 0)).toBeNull();
++  });
++});
++
++describe("images", () => {
++  it("accepte png jpeg webp seulement", () => {
++    expect(isAllowedSponsorImageType("image/png")).toBe(true);
++    expect(isAllowedSponsorImageType("image/svg+xml")).toBe(false);
++  });
++});
+diff --git a/src/lib/sponsors/logic.ts b/src/lib/sponsors/logic.ts
+new file mode 100644
+index 0000000..bc822dc
+--- /dev/null
++++ b/src/lib/sponsors/logic.ts
+@@ -0,0 +1,95 @@
++/** Logique pure sponsors (dates, rotation, pages exclues) — testable sans UI. */
++
++export type SponsorRecord = {
++  id: string;
++  nom: string;
++  image_url: string;
++  site_url?: string | null;
++  date_debut?: string | null;
++  date_fin?: string | null;
++  actif: boolean;
++  ordre: number;
++  afficher_popup?: boolean;
++  afficher_bande?: boolean;
++  vues?: number;
++  clics?: number;
++};
++
++/** Pages où le pop-up et la bande ne doivent pas apparaître. */
++export const SPONSOR_EXCLUDED_PATHS = [
++  "/inscription",
++  "/admin",
++  "/certificat",
++] as const;
++
++export function isSponsorExcludedPath(pathname: string): boolean {
++  const p = (pathname || "/").split("?")[0].replace(/\/$/, "") || "/";
++  if (p === "/admin" || p.startsWith("/admin/")) return true;
++  if (p === "/inscription" || p.startsWith("/inscription/")) return true;
++  if (p === "/certificat" || p.startsWith("/certificat/")) return true;
++  // pas de page paiement dédiée ; si ajoutée plus tard, l'exclure ici
++  if (p.startsWith("/api/")) return true;
++  return false;
++}
++
++function parseDateOnly(s: string | null | undefined): Date | null {
++  if (!s) return null;
++  const m = String(s).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
++  if (!m) return null;
++  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
++}
++
++/** Actif selon flag + fenêtre de dates (inclusives), jour UTC. */
++export function isSponsorActiveOn(
++  s: Pick<SponsorRecord, "actif" | "date_debut" | "date_fin">,
++  now: Date = new Date()
++): boolean {
++  if (!s.actif) return false;
++  const day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
++  const debut = parseDateOnly(s.date_debut);
++  const fin = parseDateOnly(s.date_fin);
++  if (debut && day < debut.getTime()) return false;
++  if (fin && day > fin.getTime()) return false;
++  return true;
++}
++
++export function filterActiveSponsors(
++  list: SponsorRecord[],
++  now: Date = new Date()
++): SponsorRecord[] {
++  return list
++    .filter((s) => isSponsorActiveOn(s, now))
++    .sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
++}
++
++export function sponsorsForPopup(list: SponsorRecord[], now?: Date): SponsorRecord[] {
++  return filterActiveSponsors(list, now).filter((s) => s.afficher_popup);
++}
++
++export function sponsorsForBand(list: SponsorRecord[], now?: Date): SponsorRecord[] {
++  return filterActiveSponsors(list, now).filter((s) => s.afficher_bande);
++}
++
++/**
++ * Rotation : un seul sponsor par visite.
++ * index stocké côté client (sessionStorage) ; on avance à chaque nouvelle visite.
++ */
++export function pickRotatedSponsor(
++  candidates: SponsorRecord[],
++  rotationIndex: number
++): SponsorRecord | null {
++  if (!candidates.length) return null;
++  const i = ((rotationIndex % candidates.length) + candidates.length) % candidates.length;
++  return candidates[i];
++}
++
++export const MAX_SPONSOR_IMAGE_BYTES = 2 * 1024 * 1024; // 2 Mo
++export const ALLOWED_SPONSOR_IMAGE_TYPES = [
++  "image/jpeg",
++  "image/png",
++  "image/webp",
++] as const;
++
++export function isAllowedSponsorImageType(mime: string): boolean {
++  return (ALLOWED_SPONSOR_IMAGE_TYPES as readonly string[]).includes(mime);
++}
+diff --git a/supabase/migrate_sponsors.sql b/supabase/migrate_sponsors.sql
+new file mode 100644
+index 0000000..8fd2f98
+--- /dev/null
++++ b/supabase/migrate_sponsors.sql
+@@ -0,0 +1,75 @@
++-- Publicité sponsors (non destructif — à exécuter manuellement par Hoby avant fusion)
++-- Aucun DROP / DELETE de données existantes.
++
++create table if not exists public.sponsors (
++  id uuid primary key default gen_random_uuid(),
++  nom text not null,
++  image_url text not null default '',
++  site_url text,
++  date_debut date,
++  date_fin date,
++  actif boolean not null default true,
++  ordre integer not null default 0,
++  afficher_popup boolean not null default false,
++  afficher_bande boolean not null default true,
++  vues integer not null default 0,
++  clics integer not null default 0,
++  created_at timestamptz not null default now(),
++  updated_at timestamptz not null default now()
++);
++
++create index if not exists idx_sponsors_actif_ordre
++  on public.sponsors (actif, ordre);
++
++-- Lecture publique limitée aux sponsors actifs dans leurs dates
++alter table public.sponsors enable row level security;
++
++drop policy if exists "sponsors_public_select_actifs" on public.sponsors;
++create policy "sponsors_public_select_actifs"
++  on public.sponsors
++  for select
++  to anon, authenticated
++  using (
++    actif = true
++    and (date_debut is null or date_debut <= (timezone('utc', now()))::date)
++    and (date_fin is null or date_fin >= (timezone('utc', now()))::date)
++  );
++
++-- Pas d'écriture publique (insert/update/delete absents pour anon)
++-- L'admin écrit via service_role (API serveur).
++
++-- Compteurs : pas d'update direct public ; fonction limitée
++create or replace function public.increment_sponsor_stat(p_id uuid, p_kind text)
++returns void
++language plpgsql
++security definer
++set search_path = public
++as $$
++begin
++  if p_kind is null or p_id is null then
++    return;
++  end if;
++  if p_kind = 'view' then
++    update public.sponsors
++    set vues = coalesce(vues, 0) + 1,
++        updated_at = now()
++    where id = p_id
++      and actif = true
++      and (date_debut is null or date_debut <= (timezone('utc', now()))::date)
++      and (date_fin is null or date_fin >= (timezone('utc', now()))::date);
++  elsif p_kind = 'click' then
++    update public.sponsors
++    set clics = coalesce(clics, 0) + 1,
++        updated_at = now()
++    where id = p_id
++      and actif = true
++      and (date_debut is null or date_debut <= (timezone('utc', now()))::date)
++      and (date_fin is null or date_fin >= (timezone('utc', now()))::date);
++  end if;
++end;
++$$;
++
++revoke all on function public.increment_sponsor_stat(uuid, text) from public;
++grant execute on function public.increment_sponsor_stat(uuid, text) to anon, authenticated;
++
++comment on table public.sponsors is 'Sponsors publicitaires (pop-up + bande logos). Compteurs anonymes uniquement.';
+-- 
+2.43.0
+

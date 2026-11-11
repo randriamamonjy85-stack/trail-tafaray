@@ -1,0 +1,2277 @@
+From 53c7476f624fc3022479ae0b6fdd1abf7dfd7e8d Mon Sep 17 00:00:00 2001
+From: Trail Tafaray Dev <trail-tafaray-bot@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 18:13:23 +0000
+Subject: [PATCH] feat: certificats finisher (import TMH/GmCAP, PDF, page
+ publique)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Parseur CSV/XLSX résultats-certificats (colonnes fixes, refus PII)
+- Admin Certificats: éditions, aperçu/confirm/rollback, paquet TMH, publier
+- Page /certificat + APIs lookup/pdf avec rate-limit
+- Migration SQL (non exécutée) certificate_editions / certificate_results
+- Désactivation guidée de la saisie manuelle des temps
+- Exemples fictifs, guide Hoby, tests vitest
+---
+ GUIDE_CERTIFICATS_HOBY.md                     |  59 +++
+ TESTS_CERTIFICATS.md                          |  28 ++
+ package.json                                  |  12 +-
+ .../certificats/exemple-resultats-2026.csv    |   6 +
+ samples/certificats/reglages-exemple-v1.json  |  57 +++
+ src/app/admin/page.tsx                        |  14 +-
+ src/app/api/admin/certificats/route.ts        | 331 ++++++++++++++++
+ src/app/api/certificat/lookup/route.ts        |  82 ++++
+ src/app/api/certificat/pdf/route.ts           |  93 +++++
+ src/app/api/certificat/results/route.ts       |  30 ++
+ src/app/certificat/page.tsx                   | 131 +++++++
+ src/components/SiteHeader.tsx                 |   1 +
+ src/components/admin/CertificatsAdmin.tsx     | 358 ++++++++++++++++++
+ .../__tests__/parse-results.test.ts           |  48 +++
+ .../certificats/__tests__/pdf-fonts.test.ts   |  25 ++
+ src/lib/certificats/normalize.ts              |  82 ++++
+ src/lib/certificats/parse-results.ts          | 240 ++++++++++++
+ src/lib/certificats/pdf.ts                    | 152 ++++++++
+ src/lib/certificats/tmh-package.ts            | 235 ++++++++++++
+ supabase/migrate_certificats.sql              |  55 +++
+ vitest.config.ts                              |   9 +
+ 21 files changed, 2044 insertions(+), 4 deletions(-)
+ create mode 100644 GUIDE_CERTIFICATS_HOBY.md
+ create mode 100644 TESTS_CERTIFICATS.md
+ create mode 100644 samples/certificats/exemple-resultats-2026.csv
+ create mode 100644 samples/certificats/reglages-exemple-v1.json
+ create mode 100644 src/app/api/admin/certificats/route.ts
+ create mode 100644 src/app/api/certificat/lookup/route.ts
+ create mode 100644 src/app/api/certificat/pdf/route.ts
+ create mode 100644 src/app/api/certificat/results/route.ts
+ create mode 100644 src/app/certificat/page.tsx
+ create mode 100644 src/components/admin/CertificatsAdmin.tsx
+ create mode 100644 src/lib/certificats/__tests__/parse-results.test.ts
+ create mode 100644 src/lib/certificats/__tests__/pdf-fonts.test.ts
+ create mode 100644 src/lib/certificats/normalize.ts
+ create mode 100644 src/lib/certificats/parse-results.ts
+ create mode 100644 src/lib/certificats/pdf.ts
+ create mode 100644 src/lib/certificats/tmh-package.ts
+ create mode 100644 supabase/migrate_certificats.sql
+ create mode 100644 vitest.config.ts
+
+diff --git a/GUIDE_CERTIFICATS_HOBY.md b/GUIDE_CERTIFICATS_HOBY.md
+new file mode 100644
+index 0000000..9f3b30e
+--- /dev/null
++++ b/GUIDE_CERTIFICATS_HOBY.md
+@@ -0,0 +1,59 @@
++# Guide certificats finisher — pour Hoby
++
++## Principe
++
++Le site **n’édite pas** le certificat et **ne calcule aucun temps**.  
++TMH (V1 ou V2) + GmCAP produisent les classements. Le site **importe** le fichier et **remplit** le modèle exporté par TMH.
++
++## 1. Préparer le fichier résultats (reprise V1)
++
++1. Exportez les classements depuis TMH V1 (Excel).
++2. Créez un fichier avec **exactement** ces colonnes (ordre fixe) :
++
++`Édition;Course;Dossard;Prénom;Nom;Genre;Catégorie;Nationalité;Statut;Temps;Classement scratch;Classement genre;Classement catégorie`
++
++3. Statuts autorisés : `FINISHER`, `DNF`, `DNS`, `DSQ`, `HORS_DELAI`.
++4. Temps au format `hh:mm:ss`. Pour non-finishers, classements vides.
++5. **N’ajoutez jamais** email, téléphone, adresse, date de naissance, CIN, contact d’urgence.
++6. Enregistrez en **CSV UTF-8** (séparateur `;`) ou **xlsx**.
++
++Exemple fictif fourni : `samples/certificats/exemple-resultats-2026.csv`.
++
++## 2. Importer dans l’admin
++
++1. Admin → **Certificats**.
++2. Créer l’édition (ex. `2026`).
++3. Choisir le fichier → **Aperçu** (lignes, finishers, erreurs, doublons).
++4. Si OK → **Confirmer l’import** (remplace l’édition, version précédente conservée pour rollback).
++
++## 3. Modèle de certificat (TMH)
++
++1. Créez le visuel dans TMH (pas sur le site).
++2. Exportez depuis TMH :
++   - image de fond JPG/PNG ;
++   - **paquet ZIP** : fond HD, `reglages.json`, polices TTF/OTF, PDF d’exemple.
++3. Dans Admin → Certificats : uploader le fond et/ou le ZIP.
++4. **Aperçu PDF** (coureur fictif) → comparer mentalement au PDF de référence TMH.
++5. **Confirmer le modèle** (obligatoire avant publication).
++
++Fichier de réglages d’exemple (V1) : `samples/certificats/reglages-exemple-v1.json`  
++À ajuster une fois avec le vrai fond V1 (positions en mm).
++
++## 4. Publier
++
++1. **Publier** l’édition (impossible sans modèle confirmé).
++2. Optionnel : activer la page résultats publics (colonnes du fichier uniquement).
++3. **Masquer** pour retirer l’accès public.
++
++## 5. Test public
++
++1. Ouvrir `/certificat`.
++2. Édition `2026`, dossard `101`, nom `Rabe` (après import de l’exemple).
++3. Vérifier → télécharger le PDF.
++
++## Sécurité
++
++- Pas de liste publique des coureurs.
++- Recherche : édition + dossard + nom (ensemble).
++- Limite d’essais côté serveur.
++- Tables Supabase : pas de lecture publique ; migration SQL à exécuter manuellement : `supabase/migrate_certificats.sql`.
+diff --git a/TESTS_CERTIFICATS.md b/TESTS_CERTIFICATS.md
+new file mode 100644
+index 0000000..8edc7eb
+--- /dev/null
++++ b/TESTS_CERTIFICATS.md
+@@ -0,0 +1,28 @@
++# Tests réellement lancés (certificats)
++
++Date de branche : feature/certificats-finisher
++
++## Automatiques (vitest)
++
++Commande : `npx vitest run src/lib/certificats`
++
++1. `parse-results.test.ts` — CSV valide (total, finishers, nom_norm)
++2. `parse-results.test.ts` — refus colonne Email interdite
++3. `parse-results.test.ts` — doublons dossard même course
++4. `parse-results.test.ts` — présence des champs dans EXAMPLE_SETTINGS_V1
++5. `pdf-fonts.test.ts` — refus de génération PDF sans polices du paquet (pas de substitution)
++
++## Non lancés dans cet environnement
++
++- Import admin bout-en-bout (nécessite session admin + Supabase)
++- Téléchargement public PDF (nécessite édition publiée + storage)
++- Comparaison visuelle PDF site vs PDF référence TMH
++- `npm run build` complet Next (dépendances réseau)
++
++## Manuel recommandé après merge + migration SQL
++
++1. Créer édition 2026
++2. Importer `samples/certificats/exemple-resultats-2026.csv` (aperçu puis confirmer)
++3. Uploader fond + paquet TMH de test
++4. Aperçu PDF fictif → confirmer modèle → publier
++5. `/certificat` avec dossard 101 / nom Rabe
+diff --git a/package.json b/package.json
+index 71ac19c..76cf12f 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,9 @@
+     "dev": "next dev --webpack",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "eslint"
++    "lint": "eslint",
++    "test": "vitest run",
++    "test:certificats": "vitest run src/lib/certificats"
+   },
+   "dependencies": {
+     "@supabase/ssr": "^0.5.2",
+@@ -14,7 +16,10 @@
+     "next": "16.4.5",
+     "react": "19.3.0",
+     "react-dom": "19.3.0",
+-    "nodemailer": "^7.0.7"
++    "nodemailer": "^7.0.7",
++    "pdf-lib": "^1.17.1",
++    "jszip": "^3.10.1",
++    "xlsx": "^0.18.5"
+   },
+   "devDependencies": {
+     "@tailwindcss/postcss": "^4",
+@@ -25,6 +30,7 @@
+     "eslint-config-next": "16.4.5",
+     "postcss": "^8",
+     "tailwindcss": "^4",
+-    "typescript": "^5"
++    "typescript": "^5",
++    "vitest": "^2.1.0"
+   }
+ }
+diff --git a/samples/certificats/exemple-resultats-2026.csv b/samples/certificats/exemple-resultats-2026.csv
+new file mode 100644
+index 0000000..77f911b
+--- /dev/null
++++ b/samples/certificats/exemple-resultats-2026.csv
+@@ -0,0 +1,6 @@
++"Édition";"Course";"Dossard";"Prénom";"Nom";"Genre";"Catégorie";"Nationalité";"Statut";"Temps";"Classement scratch";"Classement genre";"Classement catégorie"
++"2026";"Trail Découverte";"101";"Aina";"RABE";"F";"SEF";"MG";"FINISHER";"01:42:18";"12";"3";"2"
++"2026";"Trail Découverte";"102";"Jean";"RAKOTO";"H";"SEH";"MG";"FINISHER";"01:35:02";"5";"4";"1"
++"2026";"Trail Découverte";"103";"Lala";"ANDRIA";"F";"SEF";"MG";"DNF";"";"";"";""
++"2026";"Trail Endurance";"201";"Mamy";"RASOA";"H";"V1H";"MG";"DNS";"";"";"";""
++"2026";"VTT BEKA";"301";"Soa";"RATOVO";"H";"VTT";"MG";"FINISHER";"02:10:45";"8";"8";"3"
+diff --git a/samples/certificats/reglages-exemple-v1.json b/samples/certificats/reglages-exemple-v1.json
+new file mode 100644
+index 0000000..e37b5c7
+--- /dev/null
++++ b/samples/certificats/reglages-exemple-v1.json
+@@ -0,0 +1,57 @@
++{
++  "page_width_mm": 297,
++  "page_height_mm": 210,
++  "fonts": [
++    { "family": "CertificateSans", "file": "CertificateSans-Regular.ttf" }
++  ],
++  "fields": [
++    {
++      "id": "nom_complet",
++      "x_mm": 148.5,
++      "y_mm": 95,
++      "fontSize_pt": 28,
++      "fontFamily": "CertificateSans",
++      "fontWeight": "bold",
++      "color": "#1F2C3F",
++      "align": "center",
++      "maxWidth_mm": 220,
++      "autoShrink": true
++    },
++    {
++      "id": "course",
++      "x_mm": 148.5,
++      "y_mm": 115,
++      "fontSize_pt": 16,
++      "fontFamily": "CertificateSans",
++      "color": "#A1532D",
++      "align": "center"
++    },
++    {
++      "id": "temps",
++      "x_mm": 148.5,
++      "y_mm": 130,
++      "fontSize_pt": 18,
++      "fontFamily": "CertificateSans",
++      "color": "#1F2C3F",
++      "align": "center"
++    },
++    {
++      "id": "classement",
++      "x_mm": 148.5,
++      "y_mm": 145,
++      "fontSize_pt": 14,
++      "fontFamily": "CertificateSans",
++      "color": "#444444",
++      "align": "center"
++    },
++    {
++      "id": "edition",
++      "x_mm": 148.5,
++      "y_mm": 175,
++      "fontSize_pt": 12,
++      "fontFamily": "CertificateSans",
++      "color": "#666666",
++      "align": "center"
++    }
++  ]
++}
+diff --git a/src/app/admin/page.tsx b/src/app/admin/page.tsx
+index 5926d76..5f3ea7c 100644
+--- a/src/app/admin/page.tsx
++++ b/src/app/admin/page.tsx
+@@ -3,6 +3,7 @@
+ import { useEffect, useState, useCallback } from "react";
+ import { createClient } from "@/lib/supabase/client";
+ import { COURSES } from "@/lib/types";
++import CertificatsAdmin from "@/components/admin/CertificatsAdmin";
+ import CategoriesAdmin from "@/components/admin/CategoriesAdmin";
+ import CoursesAdmin from "@/components/admin/CoursesAdmin";
+ import DocumentsAdmin from "@/components/admin/DocumentsAdmin";
+@@ -481,7 +482,8 @@ export default function AdminPage() {
+         { id: "photos", label: "Photos", icon: "🖼️" },
+         { id: "documents", label: "Documents", icon: "📄" },
+         { id: "footer", label: "Pied de page", icon: "⬇️" },
+-        { id: "resultats", label: "Résultats", icon: "🏆" },
++        { id: "certificats", label: "Certificats", icon: "🏅" },
++        { id: "resultats", label: "Résultats (legacy)", icon: "🏆" },
+       ],
+     },
+     {
+@@ -1355,7 +1357,17 @@ export default function AdminPage() {
+       {tab === "courses" && <CoursesAdmin />}
+ 
+ {/* ========== RÉSULTATS ========== */}
++      {tab === "certificats" && <CertificatsAdmin />}
++
+       {tab === "resultats" && (
++        <div className="space-y-4">
++          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-950">
++            <p className="font-semibold">Saisie manuelle des temps désactivée</p>
++            <p className="mt-1">
++              La source officielle est TMH / GmCAP. Utilisez l&apos;onglet{" "}
++              <strong>Certificats</strong> pour importer le fichier résultats-certificats.
++            </p>
++          </div>
+         <div className="bg-white rounded-2xl border border-stone-200 p-6 max-w-3xl space-y-4">
+           <h2 className="text-xl font-bold text-[#1F2C3F]">Importer les résultats</h2>
+           <p className="text-sm text-stone-600">
+diff --git a/src/app/api/admin/certificats/route.ts b/src/app/api/admin/certificats/route.ts
+new file mode 100644
+index 0000000..599291e
+--- /dev/null
++++ b/src/app/api/admin/certificats/route.ts
+@@ -0,0 +1,331 @@
++import { NextResponse } from "next/server";
++import { requireAdminSession } from "@/lib/supabase/require-admin";
++import { parseResultsBuffer } from "@/lib/certificats/parse-results";
++import { parseTmhPackage } from "@/lib/certificats/tmh-package";
++import { buildCertificatePdf, FICTIVE_RUNNER } from "@/lib/certificats/pdf";
++import { writeAudit } from "@/lib/audit";
++
++export const runtime = "nodejs";
++
++/** Liste des éditions */
++export async function GET() {
++  const gate = await requireAdminSession();
++  if (gate.response) return gate.response;
++  const { data, error } = await gate.admin!
++    .from("certificate_editions")
++    .select("*")
++    .order("code", { ascending: false });
++  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++  return NextResponse.json(data || []);
++}
++
++/**
++ * Actions admin certificats (multipart ou JSON).
++ * action: create_edition | preview_results | confirm_results | rollback |
++ *         upload_template_image | upload_tmh_package | confirm_template |
++ *         publish | unpublish | set_results_public | preview_pdf
++ */
++export async function POST(request: Request) {
++  const gate = await requireAdminSession();
++  if (gate.response) return gate.response;
++  const supabase = gate.admin!;
++
++  const ctype = request.headers.get("content-type") || "";
++  if (ctype.includes("multipart/form-data")) {
++    const form = await request.formData();
++    const action = String(form.get("action") || "");
++    const editionId = String(form.get("edition_id") || "");
++
++    if (action === "preview_results") {
++      const file = form.get("file") as File | null;
++      if (!file) return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
++      const buf = await file.arrayBuffer();
++      const preview = parseResultsBuffer(buf, file.name);
++      return NextResponse.json(preview);
++    }
++
++    if (action === "confirm_results") {
++      const file = form.get("file") as File | null;
++      if (!file || !editionId)
++        return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
++      const buf = await file.arrayBuffer();
++      const preview = parseResultsBuffer(buf, file.name);
++      if (!preview.ok)
++        return NextResponse.json({ error: "Fichier invalide", preview }, { status: 400 });
++
++      const { data: ed } = await supabase
++        .from("certificate_editions")
++        .select("*")
++        .eq("id", editionId)
++        .single();
++      if (!ed) return NextResponse.json({ error: "Édition introuvable" }, { status: 404 });
++
++      // Snapshot courant pour rollback
++      const { data: oldRows } = await supabase
++        .from("certificate_results")
++        .select("*")
++        .eq("edition_id", editionId);
++      const newVersion = (ed.results_version || 0) + 1;
++
++      await supabase
++        .from("certificate_editions")
++        .update({
++          previous_snapshot: { version: ed.results_version, rows: oldRows || [] },
++          results_version: newVersion,
++          updated_at: new Date().toISOString(),
++        })
++        .eq("id", editionId);
++
++      await supabase.from("certificate_results").delete().eq("edition_id", editionId);
++
++      const inserts = preview.rows.map((r) => ({
++        edition_id: editionId,
++        edition_code: r.edition || ed.code,
++        course: r.course,
++        dossard: r.dossard,
++        prenom: r.prenom,
++        nom: r.nom,
++        nom_norm: r.nom_norm,
++        genre: r.genre,
++        categorie: r.categorie,
++        nationalite: r.nationalite,
++        statut: r.statut,
++        temps: r.temps,
++        classement_scratch: r.classement_scratch,
++        classement_genre: r.classement_genre,
++        classement_categorie: r.classement_categorie,
++        import_version: newVersion,
++      }));
++
++      if (inserts.length) {
++        const { error } = await supabase.from("certificate_results").insert(inserts);
++        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++      }
++
++      await writeAudit(supabase, gate.user?.email, "cert_import_results", "edition", editionId);
++      return NextResponse.json({
++        success: true,
++        version: newVersion,
++        total: inserts.length,
++        finishers: preview.finishers,
++      });
++    }
++
++    if (action === "upload_tmh_package") {
++      const file = form.get("file") as File | null;
++      if (!file || !editionId)
++        return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
++      const buf = await file.arrayBuffer();
++      const parsed = await parseTmhPackage(buf);
++      if (!parsed.ok)
++        return NextResponse.json({ error: parsed.errors.join(" "), errors: parsed.errors }, { status: 400 });
++
++      const bucket = "photos";
++      const base = `certificats/${editionId}`;
++
++      const bgPath = `${base}/fond.${parsed.background!.mime === "image/png" ? "png" : "jpg"}`;
++      await supabase.storage.from(bucket).upload(bgPath, parsed.background!.bytes, {
++        contentType: parsed.background!.mime,
++        upsert: true,
++      });
++
++      const fontMeta: { family: string; path: string }[] = [];
++      for (const f of parsed.fonts) {
++        const fp = `${base}/fonts/${f.file}`;
++        await supabase.storage.from(bucket).upload(fp, f.bytes, {
++          contentType: "font/ttf",
++          upsert: true,
++        });
++        fontMeta.push({ family: f.family, path: fp });
++      }
++
++      let refPath: string | null = null;
++      if (parsed.referencePdf) {
++        refPath = `${base}/reference.pdf`;
++        await supabase.storage.from(bucket).upload(refPath, parsed.referencePdf.bytes, {
++          contentType: "application/pdf",
++          upsert: true,
++        });
++      }
++
++      await supabase
++        .from("certificate_editions")
++        .update({
++          template_bg_path: bgPath,
++          template_settings: parsed.settings,
++          template_fonts: fontMeta,
++          template_reference_pdf_path: refPath,
++          template_confirmed: false,
++          updated_at: new Date().toISOString(),
++        })
++        .eq("id", editionId);
++
++      await writeAudit(supabase, gate.user?.email, "cert_template_package", "edition", editionId);
++      return NextResponse.json({ success: true, fonts: fontMeta.map((f) => f.family) });
++    }
++
++    if (action === "upload_template_image") {
++      const file = form.get("file") as File | null;
++      if (!file || !editionId)
++        return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
++      if (!/^image\/(jpeg|png)$/.test(file.type))
++        return NextResponse.json({ error: "JPG ou PNG uniquement (pas de SVG)." }, { status: 400 });
++      if (file.size > 12 * 1024 * 1024)
++        return NextResponse.json({ error: "Image trop grande (max 12 Mo)." }, { status: 400 });
++      const ext = file.type === "image/png" ? "png" : "jpg";
++      const path = `certificats/${editionId}/fond.${ext}`;
++      const bytes = new Uint8Array(await file.arrayBuffer());
++      await supabase.storage.from("photos").upload(path, bytes, {
++        contentType: file.type,
++        upsert: true,
++      });
++      await supabase
++        .from("certificate_editions")
++        .update({
++          template_bg_path: path,
++          template_confirmed: false,
++          updated_at: new Date().toISOString(),
++        })
++        .eq("id", editionId);
++      return NextResponse.json({ success: true, path });
++    }
++
++    return NextResponse.json({ error: "Action multipart inconnue" }, { status: 400 });
++  }
++
++  // JSON body
++  const body = await request.json();
++  const { action, edition_id, code, label, offsets } = body;
++
++  if (action === "create_edition") {
++    if (!code) return NextResponse.json({ error: "code requis" }, { status: 400 });
++    const { data, error } = await supabase
++      .from("certificate_editions")
++      .insert({
++        code: String(code).slice(0, 20),
++        label: String(label || `Édition ${code}`).slice(0, 120),
++      })
++      .select("*")
++      .single();
++    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
++    await writeAudit(supabase, gate.user?.email, "cert_create_edition", "edition", data.id);
++    return NextResponse.json(data);
++  }
++
++  if (action === "rollback") {
++    const { data: ed } = await supabase
++      .from("certificate_editions")
++      .select("*")
++      .eq("id", edition_id)
++      .single();
++    if (!ed?.previous_snapshot?.rows)
++      return NextResponse.json({ error: "Aucune version précédente" }, { status: 400 });
++    await supabase.from("certificate_results").delete().eq("edition_id", edition_id);
++    const rows = ed.previous_snapshot.rows.map((r: any) => {
++      const { id, created_at, ...rest } = r;
++      return { ...rest, edition_id };
++    });
++    if (rows.length) await supabase.from("certificate_results").insert(rows);
++    await supabase
++      .from("certificate_editions")
++      .update({
++        results_version: ed.previous_snapshot.version || 0,
++        previous_snapshot: null,
++        updated_at: new Date().toISOString(),
++      })
++      .eq("id", edition_id);
++    await writeAudit(supabase, gate.user?.email, "cert_rollback", "edition", edition_id);
++    return NextResponse.json({ success: true });
++  }
++
++  if (action === "confirm_template") {
++    await supabase
++      .from("certificate_editions")
++      .update({ template_confirmed: true, updated_at: new Date().toISOString() })
++      .eq("id", edition_id);
++    return NextResponse.json({ success: true });
++  }
++
++  if (action === "publish" || action === "unpublish") {
++    const { data: ed } = await supabase
++      .from("certificate_editions")
++      .select("*")
++      .eq("id", edition_id)
++      .single();
++    if (action === "publish") {
++      if (!ed?.template_confirmed)
++        return NextResponse.json(
++          { error: "Confirmez d'abord le modèle de certificat (aperçu)." },
++          { status: 400 }
++        );
++      if (!ed?.template_bg_path || !ed?.template_settings)
++        return NextResponse.json({ error: "Modèle incomplet." }, { status: 400 });
++    }
++    await supabase
++      .from("certificate_editions")
++      .update({
++        published: action === "publish",
++        updated_at: new Date().toISOString(),
++      })
++      .eq("id", edition_id);
++    await writeAudit(supabase, gate.user?.email, action, "edition", edition_id);
++    return NextResponse.json({ success: true });
++  }
++
++  if (action === "set_results_public") {
++    await supabase
++      .from("certificate_editions")
++      .update({
++        results_public: !!body.value,
++        updated_at: new Date().toISOString(),
++      })
++      .eq("id", edition_id);
++    return NextResponse.json({ success: true });
++  }
++
++  if (action === "preview_pdf") {
++    const { data: ed } = await supabase
++      .from("certificate_editions")
++      .select("*")
++      .eq("id", edition_id)
++      .single();
++    if (!ed?.template_bg_path || !ed?.template_settings)
++      return NextResponse.json({ error: "Modèle incomplet" }, { status: 400 });
++
++    const { data: bgFile, error: bgErr } = await supabase.storage
++      .from("photos")
++      .download(ed.template_bg_path);
++    if (bgErr || !bgFile)
++      return NextResponse.json({ error: "Fond introuvable" }, { status: 500 });
++    const bgBytes = new Uint8Array(await bgFile.arrayBuffer());
++    const mime = ed.template_bg_path.endsWith(".png") ? "image/png" : "image/jpeg";
++
++    const fonts: { family: string; bytes: Uint8Array }[] = [];
++    for (const f of ed.template_fonts || []) {
++      const { data: ff } = await supabase.storage.from("photos").download(f.path);
++      if (!ff)
++        return NextResponse.json({ error: `Police manquante : ${f.family}` }, { status: 400 });
++      fonts.push({ family: f.family, bytes: new Uint8Array(await ff.arrayBuffer()) });
++    }
++
++    const built = await buildCertificatePdf({
++      background: bgBytes,
++      backgroundMime: mime,
++      settings: ed.template_settings,
++      fonts,
++      runner: { ...FICTIVE_RUNNER, edition: ed.code },
++      offsets,
++    });
++    if (!built.ok || !built.pdf)
++      return NextResponse.json({ error: built.error }, { status: 400 });
++
++    return new NextResponse(Buffer.from(built.pdf), {
++      headers: {
++        "Content-Type": "application/pdf",
++        "Content-Disposition": 'inline; filename="apercu-certificat.pdf"',
++      },
++    });
++  }
++
++  return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
++}
+diff --git a/src/app/api/certificat/lookup/route.ts b/src/app/api/certificat/lookup/route.ts
+new file mode 100644
+index 0000000..c9c7e9e
+--- /dev/null
++++ b/src/app/api/certificat/lookup/route.ts
+@@ -0,0 +1,82 @@
++import { NextResponse } from "next/server";
++import { createAdminClient } from "@/lib/supabase/admin";
++import { normalizeDossard, normalizeNom } from "@/lib/certificats/normalize";
++import { rateLimit } from "@/lib/rate-limit";
++
++export const runtime = "nodejs";
++
++/** Recherche un seul coureur (édition publiée + dossard + nom). Pas de liste. */
++export async function POST(request: Request) {
++  const ip =
++    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
++    request.headers.get("x-real-ip") ||
++    "unknown";
++  const rl = rateLimit(`cert-lookup:${ip}`, 8, 60_000);
++  if (!rl.ok) {
++    return NextResponse.json(
++      { error: "Trop de tentatives. Réessayez plus tard." },
++      { status: 429 }
++    );
++  }
++
++  const body = await request.json().catch(() => ({}));
++  const editionCode = String(body.edition || "").trim();
++  const dossard = normalizeDossard(String(body.dossard || ""));
++  const nom = normalizeNom(String(body.nom || ""));
++
++  if (!editionCode || !dossard || !nom) {
++    return NextResponse.json(
++      { error: "Édition, dossard et nom de famille sont requis." },
++      { status: 400 }
++    );
++  }
++
++  const supabase = createAdminClient();
++  const { data: ed } = await supabase
++    .from("certificate_editions")
++    .select("id,code,label,published")
++    .eq("code", editionCode)
++    .eq("published", true)
++    .maybeSingle();
++
++  if (!ed) {
++    return NextResponse.json({ error: "Édition non disponible." }, { status: 404 });
++  }
++
++  const { data: row } = await supabase
++    .from("certificate_results")
++    .select(
++      "statut,course,prenom,nom,temps,classement_scratch,classement_genre,classement_categorie,dossard"
++    )
++    .eq("edition_id", ed.id)
++    .eq("dossard", dossard)
++    .eq("nom_norm", nom)
++    .maybeSingle();
++
++  if (!row) {
++    return NextResponse.json({
++      found: false,
++      message: "Aucune correspondance pour ces informations.",
++    });
++  }
++
++  if (row.statut !== "FINISHER") {
++    return NextResponse.json({
++      found: true,
++      finisher: false,
++      message: "Aucun certificat de finisher n'est disponible pour ce dossard.",
++    });
++  }
++
++  return NextResponse.json({
++    found: true,
++    finisher: true,
++    edition: ed.code,
++    course: row.course,
++    prenom: row.prenom,
++    nom: row.nom,
++    temps: row.temps,
++    // token minimal for PDF: dossard+edition verified again server-side
++    canDownload: true,
++  });
++}
+diff --git a/src/app/api/certificat/pdf/route.ts b/src/app/api/certificat/pdf/route.ts
+new file mode 100644
+index 0000000..0aa60f6
+--- /dev/null
++++ b/src/app/api/certificat/pdf/route.ts
+@@ -0,0 +1,93 @@
++import { NextResponse } from "next/server";
++import { createAdminClient } from "@/lib/supabase/admin";
++import { normalizeDossard, normalizeNom } from "@/lib/certificats/normalize";
++import { buildCertificatePdf } from "@/lib/certificats/pdf";
++import { rateLimit } from "@/lib/rate-limit";
++
++export const runtime = "nodejs";
++
++export async function POST(request: Request) {
++  const ip =
++    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
++    request.headers.get("x-real-ip") ||
++    "unknown";
++  const rl = rateLimit(`cert-pdf:${ip}`, 5, 60_000);
++  if (!rl.ok) {
++    return NextResponse.json({ error: "Trop de demandes." }, { status: 429 });
++  }
++
++  const body = await request.json().catch(() => ({}));
++  const editionCode = String(body.edition || "").trim();
++  const dossard = normalizeDossard(String(body.dossard || ""));
++  const nom = normalizeNom(String(body.nom || ""));
++
++  if (!editionCode || !dossard || !nom) {
++    return NextResponse.json({ error: "Paramètres incomplets." }, { status: 400 });
++  }
++
++  const supabase = createAdminClient();
++  const { data: ed } = await supabase
++    .from("certificate_editions")
++    .select("*")
++    .eq("code", editionCode)
++    .eq("published", true)
++    .maybeSingle();
++
++  if (!ed?.template_bg_path || !ed?.template_settings || !ed.template_confirmed) {
++    return NextResponse.json({ error: "Certificat non disponible." }, { status: 404 });
++  }
++
++  const { data: row } = await supabase
++    .from("certificate_results")
++    .select("*")
++    .eq("edition_id", ed.id)
++    .eq("dossard", dossard)
++    .eq("nom_norm", nom)
++    .eq("statut", "FINISHER")
++    .maybeSingle();
++
++  if (!row) {
++    return NextResponse.json({ error: "Aucune correspondance." }, { status: 404 });
++  }
++
++  const { data: bgFile } = await supabase.storage.from("photos").download(ed.template_bg_path);
++  if (!bgFile) return NextResponse.json({ error: "Modèle incomplet." }, { status: 500 });
++  const bgBytes = new Uint8Array(await bgFile.arrayBuffer());
++  const mime = ed.template_bg_path.endsWith(".png") ? "image/png" : "image/jpeg";
++
++  const fonts: { family: string; bytes: Uint8Array }[] = [];
++  for (const f of ed.template_fonts || []) {
++    const { data: ff } = await supabase.storage.from("photos").download(f.path);
++    if (!ff)
++      return NextResponse.json({ error: "Police du modèle indisponible." }, { status: 500 });
++    fonts.push({ family: f.family, bytes: new Uint8Array(await ff.arrayBuffer()) });
++  }
++
++  const built = await buildCertificatePdf({
++    background: bgBytes,
++    backgroundMime: mime,
++    settings: ed.template_settings,
++    fonts,
++    runner: {
++      prenom: row.prenom,
++      nom: row.nom,
++      course: row.course,
++      temps: row.temps,
++      classement_scratch: row.classement_scratch,
++      classement_genre: row.classement_genre,
++      classement_categorie: row.classement_categorie,
++      edition: ed.code,
++    },
++  });
++
++  if (!built.ok || !built.pdf) {
++    return NextResponse.json({ error: built.error || "Erreur PDF" }, { status: 500 });
++  }
++
++  return new NextResponse(Buffer.from(built.pdf), {
++    headers: {
++      "Content-Type": "application/pdf",
++      "Content-Disposition": `attachment; filename="certificat-${ed.code}-${dossard}.pdf"`,
++    },
++  });
++}
+diff --git a/src/app/api/certificat/results/route.ts b/src/app/api/certificat/results/route.ts
+new file mode 100644
+index 0000000..2870851
+--- /dev/null
++++ b/src/app/api/certificat/results/route.ts
+@@ -0,0 +1,30 @@
++import { NextResponse } from "next/server";
++import { createAdminClient } from "@/lib/supabase/admin";
++
++export async function GET(request: Request) {
++  const { searchParams } = new URL(request.url);
++  const edition = searchParams.get("edition") || "";
++  if (!edition) return NextResponse.json({ error: "edition requise" }, { status: 400 });
++
++  const supabase = createAdminClient();
++  const { data: ed } = await supabase
++    .from("certificate_editions")
++    .select("id,published,results_public")
++    .eq("code", edition)
++    .maybeSingle();
++
++  if (!ed?.published || !ed.results_public) {
++    return NextResponse.json({ error: "Résultats non publics." }, { status: 404 });
++  }
++
++  const { data } = await supabase
++    .from("certificate_results")
++    .select(
++      "course,dossard,prenom,nom,genre,categorie,nationalite,statut,temps,classement_scratch,classement_genre,classement_categorie"
++    )
++    .eq("edition_id", ed.id)
++    .order("course")
++    .order("classement_scratch");
++
++  return NextResponse.json(data || []);
++}
+diff --git a/src/app/certificat/page.tsx b/src/app/certificat/page.tsx
+new file mode 100644
+index 0000000..7069a98
+--- /dev/null
++++ b/src/app/certificat/page.tsx
+@@ -0,0 +1,131 @@
++"use client";
++
++import { useEffect, useState } from "react";
++
++export default function MonCertificatPage() {
++  const [editions, setEditions] = useState<{ code: string; label: string }[]>([]);
++  const [edition, setEdition] = useState("");
++  const [dossard, setDossard] = useState("");
++  const [nom, setNom] = useState("");
++  const [msg, setMsg] = useState("");
++  const [canDl, setCanDl] = useState(false);
++  const [loading, setLoading] = useState(false);
++
++  useEffect(() => {
++    // published editions via public results endpoint won't list all; use lookup only
++    // minimal: user types edition code known from event
++  }, []);
++
++  const lookup = async (e: React.FormEvent) => {
++    e.preventDefault();
++    setMsg("");
++    setCanDl(false);
++    setLoading(true);
++    try {
++      const res = await fetch("/api/certificat/lookup", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ edition, dossard, nom }),
++      });
++      const data = await res.json();
++      if (!res.ok) {
++        setMsg(data.error || "Erreur");
++      } else if (!data.found) {
++        setMsg(data.message || "Aucune correspondance");
++      } else if (!data.finisher) {
++        setMsg(data.message || "Certificat non disponible");
++      } else {
++        setMsg(`Finisher trouvé : ${data.prenom} ${data.nom} — ${data.course} — ${data.temps}`);
++        setCanDl(true);
++      }
++    } catch {
++      setMsg("Erreur réseau");
++    }
++    setLoading(false);
++  };
++
++  const download = async () => {
++    setLoading(true);
++    try {
++      const res = await fetch("/api/certificat/pdf", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ edition, dossard, nom }),
++      });
++      if (!res.ok) {
++        const d = await res.json().catch(() => ({}));
++        setMsg(d.error || "Téléchargement impossible");
++        setLoading(false);
++        return;
++      }
++      const blob = await res.blob();
++      const url = URL.createObjectURL(blob);
++      const a = document.createElement("a");
++      a.href = url;
++      a.download = `certificat-${edition}.pdf`;
++      a.click();
++      URL.revokeObjectURL(url);
++    } catch {
++      setMsg("Erreur réseau");
++    }
++    setLoading(false);
++  };
++
++  return (
++    <div className="max-w-lg mx-auto px-4 py-12">
++      <h1 className="text-3xl font-bold text-[#1F2C3F] mb-2">Mon certificat</h1>
++      <p className="text-stone-600 text-sm mb-8">
++        Résultats officiels TMH / GmCAP. Saisissez l&apos;édition, votre dossard et votre nom de
++        famille.
++      </p>
++      <form onSubmit={lookup} className="space-y-4 bg-white border border-stone-200 rounded-2xl p-6">
++        <div>
++          <label className="text-sm font-medium">Édition</label>
++          <input
++            className="w-full border rounded-lg px-3 py-2 mt-1"
++            placeholder="ex. 2026"
++            value={edition}
++            onChange={(e) => setEdition(e.target.value)}
++            required
++          />
++        </div>
++        <div>
++          <label className="text-sm font-medium">N° de dossard</label>
++          <input
++            className="w-full border rounded-lg px-3 py-2 mt-1"
++            value={dossard}
++            onChange={(e) => setDossard(e.target.value)}
++            required
++          />
++        </div>
++        <div>
++          <label className="text-sm font-medium">Nom de famille</label>
++          <input
++            className="w-full border rounded-lg px-3 py-2 mt-1"
++            value={nom}
++            onChange={(e) => setNom(e.target.value)}
++            required
++          />
++        </div>
++        <button
++          type="submit"
++          disabled={loading}
++          className="w-full bg-[#1F2C3F] text-white py-3 rounded-full font-medium disabled:opacity-50"
++        >
++          Vérifier
++        </button>
++      </form>
++      {msg && <p className="mt-4 text-sm text-stone-700">{msg}</p>}
++      {canDl && (
++        <button
++          type="button"
++          onClick={download}
++          disabled={loading}
++          className="mt-4 w-full bg-[#A1532D] text-white py-3 rounded-full font-medium"
++        >
++          Télécharger le PDF
++        </button>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/SiteHeader.tsx b/src/components/SiteHeader.tsx
+index 2f902b8..e48e547 100644
+--- a/src/components/SiteHeader.tsx
++++ b/src/components/SiteHeader.tsx
+@@ -8,6 +8,7 @@ const links = [
+   { href: "/courses", label: "Courses" },
+   { href: "/inscription", label: "Inscription" },
+   { href: "/resultats", label: "Résultats" },
++  { href: "/certificat", label: "Mon certificat" },
+   { href: "/galerie", label: "Galerie" },
+   { href: "/documents", label: "Documents" },
+   { href: "/partenaires", label: "Partenaires" },
+diff --git a/src/components/admin/CertificatsAdmin.tsx b/src/components/admin/CertificatsAdmin.tsx
+new file mode 100644
+index 0000000..35e31f2
+--- /dev/null
++++ b/src/components/admin/CertificatsAdmin.tsx
+@@ -0,0 +1,358 @@
++"use client";
++
++import { useCallback, useEffect, useState } from "react";
++
++type Edition = {
++  id: string;
++  code: string;
++  label: string;
++  published: boolean;
++  results_version: number;
++  template_confirmed: boolean;
++  results_public: boolean;
++  template_bg_path?: string;
++  previous_snapshot?: unknown;
++};
++
++export default function CertificatsAdmin() {
++  const [editions, setEditions] = useState<Edition[]>([]);
++  const [editionId, setEditionId] = useState("");
++  const [newCode, setNewCode] = useState("2026");
++  const [newLabel, setNewLabel] = useState("Trail Tafaray 2026");
++  const [msg, setMsg] = useState("");
++  const [preview, setPreview] = useState<any>(null);
++  const [resultsFile, setResultsFile] = useState<File | null>(null);
++
++  const load = useCallback(async () => {
++    const res = await fetch("/api/admin/certificats");
++    if (res.ok) {
++      const data = await res.json();
++      setEditions(data);
++      if (!editionId && data[0]) setEditionId(data[0].id);
++    }
++  }, [editionId]);
++
++  useEffect(() => {
++    load();
++  }, [load]);
++
++  const ed = editions.find((e) => e.id === editionId);
++
++  const postJson = async (body: object) => {
++    const res = await fetch("/api/admin/certificats", {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify(body),
++    });
++    const data = await res.json().catch(() => ({}));
++    if (!res.ok) throw new Error(data.error || "Erreur");
++    return data;
++  };
++
++  const createEdition = async () => {
++    try {
++      const data = await postJson({
++        action: "create_edition",
++        code: newCode,
++        label: newLabel,
++      });
++      setMsg(`Édition ${data.code} créée`);
++      await load();
++      setEditionId(data.id);
++    } catch (e: any) {
++      setMsg(e.message);
++    }
++  };
++
++  const previewResults = async () => {
++    if (!resultsFile) return setMsg("Choisissez un fichier CSV ou XLSX");
++    const fd = new FormData();
++    fd.set("action", "preview_results");
++    fd.set("file", resultsFile);
++    const res = await fetch("/api/admin/certificats", { method: "POST", body: fd });
++    const data = await res.json();
++    setPreview(data);
++    setMsg(data.ok ? "Aperçu OK — confirmez pour importer" : "Erreurs dans le fichier");
++  };
++
++  const confirmResults = async () => {
++    if (!resultsFile || !editionId) return;
++    if (!preview?.ok) return setMsg("Corrigez le fichier avant confirmation");
++    const fd = new FormData();
++    fd.set("action", "confirm_results");
++    fd.set("edition_id", editionId);
++    fd.set("file", resultsFile);
++    const res = await fetch("/api/admin/certificats", { method: "POST", body: fd });
++    const data = await res.json();
++    if (!res.ok) setMsg(data.error || "Erreur import");
++    else {
++      setMsg(`Import version ${data.version} : ${data.total} lignes, ${data.finishers} finishers`);
++      setPreview(null);
++      await load();
++    }
++  };
++
++  const uploadPackage = async (file: File) => {
++    if (!editionId) return;
++    const fd = new FormData();
++    fd.set("action", "upload_tmh_package");
++    fd.set("edition_id", editionId);
++    fd.set("file", file);
++    const res = await fetch("/api/admin/certificats", { method: "POST", body: fd });
++    const data = await res.json();
++    setMsg(res.ok ? `Paquet TMH accepté (${(data.fonts || []).join(", ")})` : data.error);
++    await load();
++  };
++
++  const uploadBg = async (file: File) => {
++    if (!editionId) return;
++    const fd = new FormData();
++    fd.set("action", "upload_template_image");
++    fd.set("edition_id", editionId);
++    fd.set("file", file);
++    const res = await fetch("/api/admin/certificats", { method: "POST", body: fd });
++    const data = await res.json();
++    setMsg(res.ok ? "Fond enregistré" : data.error);
++    await load();
++  };
++
++  return (
++    <div className="space-y-8">
++      <div>
++        <h2 className="text-xl font-bold text-[#1F2C3F] mb-1">Certificats finisher</h2>
++        <p className="text-sm text-stone-600">
++          Source officielle : TMH / GmCAP. Le site ne calcule aucun temps et n&apos;édite pas le
++          graphique du certificat.
++        </p>
++      </div>
++
++      {msg && (
++        <div className="text-sm bg-stone-50 border border-stone-200 rounded-xl px-4 py-3">{msg}</div>
++      )}
++
++      <section className="border border-stone-200 rounded-2xl p-5 space-y-3">
++        <h3 className="font-semibold text-[#1F2C3F]">1. Édition</h3>
++        <div className="flex flex-wrap gap-2 items-end">
++          <div>
++            <label className="text-xs text-stone-500">Édition active</label>
++            <select
++              className="block border rounded-lg px-3 py-2 text-sm"
++              value={editionId}
++              onChange={(e) => setEditionId(e.target.value)}
++            >
++              <option value="">—</option>
++              {editions.map((e) => (
++                <option key={e.id} value={e.id}>
++                  {e.code} — {e.label} {e.published ? "(publiée)" : ""}
++                </option>
++              ))}
++            </select>
++          </div>
++          <div>
++            <label className="text-xs text-stone-500">Code</label>
++            <input
++              className="block border rounded-lg px-3 py-2 text-sm"
++              value={newCode}
++              onChange={(e) => setNewCode(e.target.value)}
++            />
++          </div>
++          <div>
++            <label className="text-xs text-stone-500">Libellé</label>
++            <input
++              className="block border rounded-lg px-3 py-2 text-sm"
++              value={newLabel}
++              onChange={(e) => setNewLabel(e.target.value)}
++            />
++          </div>
++          <button
++            type="button"
++            onClick={createEdition}
++            className="bg-[#1F2C3F] text-white px-4 py-2 rounded-full text-sm"
++          >
++            Créer
++          </button>
++        </div>
++        {ed && (
++          <p className="text-xs text-stone-500">
++            Version résultats : {ed.results_version} · Modèle confirmé :{" "}
++            {ed.template_confirmed ? "oui" : "non"} · Publiée : {ed.published ? "oui" : "non"}
++          </p>
++        )}
++      </section>
++
++      <section className="border border-stone-200 rounded-2xl p-5 space-y-3">
++        <h3 className="font-semibold text-[#1F2C3F]">2. Import résultats (CSV / XLSX)</h3>
++        <input
++          type="file"
++          accept=".csv,.xlsx,.xls"
++          onChange={(e) => setResultsFile(e.target.files?.[0] || null)}
++        />
++        <div className="flex flex-wrap gap-2">
++          <button
++            type="button"
++            onClick={previewResults}
++            className="border border-stone-300 px-4 py-2 rounded-full text-sm"
++          >
++            Aperçu
++          </button>
++          <button
++            type="button"
++            onClick={confirmResults}
++            className="bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm"
++          >
++            Confirmer l&apos;import
++          </button>
++          {ed?.previous_snapshot != null && (
++            <button
++              type="button"
++              onClick={async () => {
++                try {
++                  await postJson({ action: "rollback", edition_id: editionId });
++                  setMsg("Version précédente restaurée");
++                  await load();
++                } catch (e: any) {
++                  setMsg(e.message);
++                }
++              }}
++              className="border border-amber-300 text-amber-900 px-4 py-2 rounded-full text-sm"
++            >
++              Revenir en arrière
++            </button>
++          )}
++        </div>
++        {preview && (
++          <div className="text-sm bg-stone-50 rounded-xl p-4 space-y-1">
++            <p>
++              Lignes : {preview.total} · Finishers : {preview.finishers} · OK :{" "}
++              {preview.ok ? "oui" : "non"}
++            </p>
++            {(preview.errors || []).map((e: string, i: number) => (
++              <p key={i} className="text-red-700">
++                {e}
++              </p>
++            ))}
++            {(preview.duplicates || []).map((e: string, i: number) => (
++              <p key={i} className="text-amber-800">
++                Doublon : {e}
++              </p>
++            ))}
++          </div>
++        )}
++      </section>
++
++      <section className="border border-stone-200 rounded-2xl p-5 space-y-3">
++        <h3 className="font-semibold text-[#1F2C3F]">3. Modèle TMH (fond + paquet ZIP)</h3>
++        <p className="text-xs text-stone-500">
++          Le modèle est créé dans TMH. Importez le fond (JPG/PNG) et le paquet ZIP (fond HD, JSON,
++          polices TTF/OTF, PDF de référence). Aucune substitution de police.
++        </p>
++        <div className="flex flex-wrap gap-4">
++          <label className="text-sm">
++            Fond seul
++            <input
++              type="file"
++              accept="image/jpeg,image/png"
++              className="block mt-1"
++              onChange={(e) => e.target.files?.[0] && uploadBg(e.target.files[0])}
++            />
++          </label>
++          <label className="text-sm">
++            Paquet ZIP TMH
++            <input
++              type="file"
++              accept=".zip"
++              className="block mt-1"
++              onChange={(e) => e.target.files?.[0] && uploadPackage(e.target.files[0])}
++            />
++          </label>
++        </div>
++        <div className="flex flex-wrap gap-2">
++          <a
++            className="border border-stone-300 px-4 py-2 rounded-full text-sm"
++            href={`/api/admin/certificats`}
++            onClick={async (e) => {
++              e.preventDefault();
++              const res = await fetch("/api/admin/certificats", {
++                method: "POST",
++                headers: { "Content-Type": "application/json" },
++                body: JSON.stringify({ action: "preview_pdf", edition_id: editionId }),
++              });
++              if (!res.ok) {
++                const d = await res.json();
++                setMsg(d.error || "Aperçu impossible");
++                return;
++              }
++              const blob = await res.blob();
++              window.open(URL.createObjectURL(blob), "_blank");
++            }}
++          >
++            Aperçu PDF (coureur fictif)
++          </a>
++          <button
++            type="button"
++            className="bg-emerald-700 text-white px-4 py-2 rounded-full text-sm"
++            onClick={async () => {
++              try {
++                await postJson({ action: "confirm_template", edition_id: editionId });
++                setMsg("Modèle confirmé");
++                await load();
++              } catch (e: any) {
++                setMsg(e.message);
++              }
++            }}
++          >
++            Confirmer le modèle
++          </button>
++        </div>
++      </section>
++
++      <section className="border border-stone-200 rounded-2xl p-5 space-y-3">
++        <h3 className="font-semibold text-[#1F2C3F]">4. Publication</h3>
++        <div className="flex flex-wrap gap-2">
++          <button
++            type="button"
++            className="bg-[#5b4dff] text-white px-4 py-2 rounded-full text-sm"
++            onClick={async () => {
++              try {
++                await postJson({ action: "publish", edition_id: editionId });
++                setMsg("Édition publiée");
++                await load();
++              } catch (e: any) {
++                setMsg(e.message);
++              }
++            }}
++          >
++            Publier
++          </button>
++          <button
++            type="button"
++            className="border border-stone-300 px-4 py-2 rounded-full text-sm"
++            onClick={async () => {
++              await postJson({ action: "unpublish", edition_id: editionId });
++              setMsg("Édition masquée");
++              await load();
++            }}
++          >
++            Masquer
++          </button>
++          <button
++            type="button"
++            className="border border-stone-300 px-4 py-2 rounded-full text-sm"
++            onClick={async () => {
++              await postJson({
++                action: "set_results_public",
++                edition_id: editionId,
++                value: !ed?.results_public,
++              });
++              await load();
++            }}
++          >
++            {ed?.results_public
++              ? "Masquer page résultats"
++              : "Activer page résultats (colonnes fichier uniquement)"}
++          </button>
++        </div>
++      </section>
++    </div>
++  );
++}
+diff --git a/src/lib/certificats/__tests__/parse-results.test.ts b/src/lib/certificats/__tests__/parse-results.test.ts
+new file mode 100644
+index 0000000..e21acb0
+--- /dev/null
++++ b/src/lib/certificats/__tests__/parse-results.test.ts
+@@ -0,0 +1,48 @@
++import { describe, it, expect } from "vitest";
++import { parseResultsBuffer } from "../parse-results";
++import { normalizeNom } from "../normalize";
++import { EXAMPLE_SETTINGS_V1 } from "../tmh-package";
++
++const sample = `"Édition";"Course";"Dossard";"Prénom";"Nom";"Genre";"Catégorie";"Nationalité";"Statut";"Temps";"Classement scratch";"Classement genre";"Classement catégorie"
++"2026";"Trail Découverte";"101";"Aina";"RABE";"F";"SEF";"MG";"FINISHER";"01:42:18";"12";"3";"2"
++"2026";"Trail Découverte";"102";"Lala";"ANDRIA";"F";"SEF";"MG";"DNF";"";"";"";""
++`;
++
++describe("parseResultsBuffer", () => {
++  it("parse un CSV valide", () => {
++    const buf = Buffer.from(sample, "utf8");
++    const p = parseResultsBuffer(buf, "test.csv");
++    expect(p.ok).toBe(true);
++    expect(p.total).toBe(2);
++    expect(p.finishers).toBe(1);
++    expect(p.rows[0].nom_norm).toBe(normalizeNom("RABE"));
++  });
++
++  it("refuse une colonne interdite", () => {
++    const bad =
++      `"Édition";"Course";"Dossard";"Prénom";"Nom";"Genre";"Catégorie";"Nationalité";"Statut";"Temps";"Classement scratch";"Classement genre";"Classement catégorie";"Email"\n` +
++      `"2026";"Trail Découverte";"1";"A";"B";"H";"SEH";"MG";"FINISHER";"01:00:00";"1";"1";"1";"x@y.z"\n`;
++    const p = parseResultsBuffer(Buffer.from(bad), "bad.csv");
++    expect(p.ok).toBe(false);
++    expect(p.errors.some((e) => /interdite/i.test(e))).toBe(true);
++  });
++
++  it("détecte les doublons de dossard", () => {
++    const dup =
++      `"Édition";"Course";"Dossard";"Prénom";"Nom";"Genre";"Catégorie";"Nationalité";"Statut";"Temps";"Classement scratch";"Classement genre";"Classement catégorie"\n` +
++      `"2026";"Trail Découverte";"101";"A";"RABE";"F";"SEF";"MG";"FINISHER";"01:00:00";"1";"1";"1"\n` +
++      `"2026";"Trail Découverte";"101";"B";"RAKOTO";"H";"SEH";"MG";"FINISHER";"01:01:00";"2";"2";"2"\n`;
++    const p = parseResultsBuffer(Buffer.from(dup), "dup.csv");
++    expect(p.ok).toBe(false);
++    expect(p.duplicates.length).toBeGreaterThan(0);
++  });
++});
++
++describe("EXAMPLE_SETTINGS_V1", () => {
++  it("définit les champs obligatoires", () => {
++    const ids = EXAMPLE_SETTINGS_V1.fields.map((f) => f.id);
++    expect(ids).toEqual(
++      expect.arrayContaining(["nom_complet", "course", "temps", "classement", "edition"])
++    );
++  });
++});
+diff --git a/src/lib/certificats/__tests__/pdf-fonts.test.ts b/src/lib/certificats/__tests__/pdf-fonts.test.ts
+new file mode 100644
+index 0000000..a420fe3
+--- /dev/null
++++ b/src/lib/certificats/__tests__/pdf-fonts.test.ts
+@@ -0,0 +1,25 @@
++import { describe, it, expect } from "vitest";
++import { buildCertificatePdf, FICTIVE_RUNNER } from "../pdf";
++import { EXAMPLE_SETTINGS_V1 } from "../tmh-package";
++
++/** Sans vraie police TTF du paquet TMH, le générateur doit refuser (pas de substitution). */
++describe("buildCertificatePdf", () => {
++  it("refuse si les polices du modèle manquent", async () => {
++    // 1x1 PNG
++    const png = Uint8Array.from(
++      Buffer.from(
++        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
++        "base64"
++      )
++    );
++    const res = await buildCertificatePdf({
++      background: png,
++      backgroundMime: "image/png",
++      settings: EXAMPLE_SETTINGS_V1,
++      fonts: [], // volontairement vide
++      runner: FICTIVE_RUNNER,
++    });
++    expect(res.ok).toBe(false);
++    expect(res.error || "").toMatch(/[Pp]olice/);
++  });
++});
+diff --git a/src/lib/certificats/normalize.ts b/src/lib/certificats/normalize.ts
+new file mode 100644
+index 0000000..5fc2f47
+--- /dev/null
++++ b/src/lib/certificats/normalize.ts
+@@ -0,0 +1,82 @@
++/** Normalisation nom : minuscules, sans accents, espaces compactés. */
++export function normalizeNom(s: string): string {
++  return String(s || "")
++    .normalize("NFD")
++    .replace(/[\u0300-\u036f]/g, "")
++    .toLowerCase()
++    .replace(/[^a-z0-9\s\-']/gi, "")
++    .replace(/\s+/g, " ")
++    .trim();
++}
++
++export function normalizeDossard(s: string): string {
++  return String(s || "").trim().replace(/^0+/, "") || String(s || "").trim();
++}
++
++export function sanitizeField(v: unknown, max = 120): string {
++  let s = String(v ?? "")
++    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
++    .trim();
++  const stripped = s.replace(/^[\s\t\r\n]+/, "");
++  if (/^[=+\-@\t]/.test(stripped)) s = "'" + s;
++  if (s.length > max) s = s.slice(0, max);
++  return s;
++}
++
++export const ALLOWED_STATUTS = [
++  "FINISHER",
++  "DNF",
++  "DNS",
++  "DSQ",
++  "HORS_DELAI",
++] as const;
++
++export type StatutCert = (typeof ALLOWED_STATUTS)[number];
++
++export const REQUIRED_HEADERS = [
++  "Édition",
++  "Course",
++  "Dossard",
++  "Prénom",
++  "Nom",
++  "Genre",
++  "Catégorie",
++  "Nationalité",
++  "Statut",
++  "Temps",
++  "Classement scratch",
++  "Classement genre",
++  "Classement catégorie",
++] as const;
++
++export const FORBIDDEN_HEADER_HINTS = [
++  "email",
++  "e-mail",
++  "mail",
++  "téléphone",
++  "telephone",
++  "phone",
++  "adresse",
++  "address",
++  "naissance",
++  "birth",
++  "identité",
++  "identite",
++  "passeport",
++  "passport",
++  "urgence",
++  "cin",
++];
++
++export function isForbiddenHeader(h: string): boolean {
++  const n = h
++    .normalize("NFD")
++    .replace(/[\u0300-\u036f]/g, "")
++    .toLowerCase();
++  return FORBIDDEN_HEADER_HINTS.some((k) => n.includes(k));
++}
++
++export function isValidTemps(t: string): boolean {
++  if (!t) return true; // vide ok si non finisher
++  return /^\d{1,2}:\d{2}:\d{2}$/.test(t.trim());
++}
+diff --git a/src/lib/certificats/parse-results.ts b/src/lib/certificats/parse-results.ts
+new file mode 100644
+index 0000000..8c0d322
+--- /dev/null
++++ b/src/lib/certificats/parse-results.ts
+@@ -0,0 +1,240 @@
++import * as XLSX from "xlsx";
++import {
++  ALLOWED_STATUTS,
++  FORBIDDEN_HEADER_HINTS,
++  REQUIRED_HEADERS,
++  isForbiddenHeader,
++  isValidTemps,
++  normalizeDossard,
++  normalizeNom,
++  sanitizeField,
++  type StatutCert,
++} from "./normalize";
++
++export type ResultRow = {
++  edition: string;
++  course: string;
++  dossard: string;
++  prenom: string;
++  nom: string;
++  nom_norm: string;
++  genre: string;
++  categorie: string;
++  nationalite: string;
++  statut: StatutCert;
++  temps: string;
++  classement_scratch: string;
++  classement_genre: string;
++  classement_categorie: string;
++};
++
++export type ParsePreview = {
++  ok: boolean;
++  rows: ResultRow[];
++  errors: string[];
++  warnings: string[];
++  total: number;
++  finishers: number;
++  duplicates: string[];
++};
++
++function parseCsv(text: string): string[][] {
++  const rows: string[][] = [];
++  let row: string[] = [];
++  let cur = "";
++  let inQ = false;
++  for (let i = 0; i < text.length; i++) {
++    const c = text[i];
++    if (inQ) {
++      if (c === '"') {
++        if (text[i + 1] === '"') {
++          cur += '"';
++          i++;
++        } else inQ = false;
++      } else cur += c;
++    } else {
++      if (c === '"') inQ = true;
++      else if (c === ";") {
++        row.push(cur);
++        cur = "";
++      } else if (c === "\n") {
++        row.push(cur);
++        rows.push(row);
++        row = [];
++        cur = "";
++      } else if (c === "\r") {
++        /* skip */
++      } else cur += c;
++    }
++  }
++  if (cur.length || row.length) {
++    row.push(cur);
++    rows.push(row);
++  }
++  return rows.filter((r) => r.some((c) => c.trim() !== ""));
++}
++
++function mapHeaders(header: string[]): Record<string, number> {
++  const map: Record<string, number> = {};
++  header.forEach((h, i) => {
++    map[h.trim()] = i;
++  });
++  return map;
++}
++
++function headerMatches(actual: string[], required: readonly string[]): boolean {
++  if (actual.length < required.length) return false;
++  return required.every((r, i) => actual[i]?.trim() === r);
++}
++
++export function parseResultsBuffer(
++  buf: ArrayBuffer | Buffer,
++  filename: string
++): ParsePreview {
++  const errors: string[] = [];
++  const warnings: string[] = [];
++  let matrix: string[][] = [];
++
++  const name = filename.toLowerCase();
++  if (name.endsWith(".csv") || name.endsWith(".txt")) {
++    const text = Buffer.from(buf as ArrayBuffer).toString("utf8").replace(/^\uFEFF/, "");
++    matrix = parseCsv(text);
++  } else if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
++    const wb = XLSX.read(buf, { type: "buffer", cellText: true, cellDates: false });
++    const sheet = wb.Sheets[wb.SheetNames[0]];
++    const raw = XLSX.utils.sheet_to_json<string[]>(sheet, {
++      header: 1,
++      raw: false,
++      defval: "",
++    }) as string[][];
++    matrix = raw.map((r) => r.map((c) => String(c ?? "")));
++  } else {
++    return {
++      ok: false,
++      rows: [],
++      errors: ["Format non supporté. Utilisez .csv ou .xlsx."],
++      warnings: [],
++      total: 0,
++      finishers: 0,
++      duplicates: [],
++    };
++  }
++
++  if (!matrix.length) {
++    return {
++      ok: false,
++      rows: [],
++      errors: ["Fichier vide."],
++      warnings: [],
++      total: 0,
++      finishers: 0,
++      duplicates: [],
++    };
++  }
++
++  const header = matrix[0].map((h) => String(h).trim());
++  for (const h of header) {
++    if (isForbiddenHeader(h)) {
++      errors.push(`Colonne interdite détectée : « ${h} ».`);
++    }
++  }
++  // also scan extra columns beyond required
++  for (let i = REQUIRED_HEADERS.length; i < header.length; i++) {
++    if (header[i] && isForbiddenHeader(header[i])) {
++      errors.push(`Colonne interdite : « ${header[i]} ».`);
++    }
++  }
++
++  if (!headerMatches(header, REQUIRED_HEADERS)) {
++    errors.push(
++      `En-tête incorrect. Attendu exactement : ${REQUIRED_HEADERS.join(";")}`
++    );
++  }
++
++  if (errors.length) {
++    return {
++      ok: false,
++      rows: [],
++      errors,
++      warnings,
++      total: 0,
++      finishers: 0,
++      duplicates: [],
++    };
++  }
++
++  const rows: ResultRow[] = [];
++  const seen = new Map<string, number>();
++  const duplicates: string[] = [];
++
++  for (let r = 1; r < matrix.length; r++) {
++    const line = matrix[r];
++    if (!line || line.every((c) => !String(c).trim())) continue;
++    const get = (i: number) => sanitizeField(line[i] ?? "", 120);
++
++    const statutRaw = get(8).toUpperCase().replace(/\s+/g, "_");
++    if (!(ALLOWED_STATUTS as readonly string[]).includes(statutRaw)) {
++      errors.push(`Ligne ${r + 1}: statut invalide « ${get(8)} ».`);
++      continue;
++    }
++    const statut = statutRaw as StatutCert;
++    let temps = get(9);
++    let cs = get(10);
++    let cg = get(11);
++    let cc = get(12);
++    if (statut !== "FINISHER") {
++      cs = "";
++      cg = "";
++      cc = "";
++      if (!temps) temps = "";
++    }
++    if (temps && !isValidTemps(temps)) {
++      errors.push(`Ligne ${r + 1}: temps invalide « ${temps} » (hh:mm:ss).`);
++      continue;
++    }
++
++    const course = get(1);
++    const dossard = normalizeDossard(get(2));
++    const nom = get(4);
++    if (!course || !dossard || !nom) {
++      errors.push(`Ligne ${r + 1}: course, dossard ou nom manquant.`);
++      continue;
++    }
++    const key = `${course}||${dossard}`;
++    if (seen.has(key)) {
++      duplicates.push(`${course} / dossard ${dossard} (lignes ${seen.get(key)} et ${r + 1})`);
++    } else seen.set(key, r + 1);
++
++    rows.push({
++      edition: get(0),
++      course,
++      dossard,
++      prenom: get(3),
++      nom,
++      nom_norm: normalizeNom(nom),
++      genre: get(5),
++      categorie: get(6),
++      nationalite: get(7),
++      statut,
++      temps,
++      classement_scratch: cs,
++      classement_genre: cg,
++      classement_categorie: cc,
++    });
++  }
++
++  if (duplicates.length) {
++    errors.push(`Doublons dossard dans une même course : ${duplicates.join(" ; ")}`);
++  }
++
++  const finishers = rows.filter((x) => x.statut === "FINISHER").length;
++  return {
++    ok: errors.length === 0,
++    rows,
++    errors,
++    warnings,
++    total: rows.length,
++    finishers,
++    duplicates,
++  };
++}
+diff --git a/src/lib/certificats/pdf.ts b/src/lib/certificats/pdf.ts
+new file mode 100644
+index 0000000..52d22e7
+--- /dev/null
++++ b/src/lib/certificats/pdf.ts
+@@ -0,0 +1,152 @@
++import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
++import type { FieldSettings, TemplateSettings } from "./tmh-package";
++import type { ResultRow } from "./parse-results";
++
++const MM_TO_PT = 72 / 25.4;
++
++export type FontBytes = { family: string; bytes: Uint8Array };
++
++export type BuildInput = {
++  background: Uint8Array;
++  backgroundMime: string;
++  settings: TemplateSettings;
++  fonts: FontBytes[];
++  runner: Pick<
++    ResultRow,
++    | "prenom"
++    | "nom"
++    | "course"
++    | "temps"
++    | "classement_scratch"
++    | "classement_genre"
++    | "classement_categorie"
++    | "edition"
++  >;
++  /** Décalages de secours en mm (admin) */
++  offsets?: Partial<Record<string, { dx_mm?: number; dy_mm?: number }>>;
++};
++
++function parseColor(c?: string) {
++  if (!c || !/^#[0-9a-fA-F]{6}$/.test(c)) return rgb(0.12, 0.17, 0.25);
++  const n = parseInt(c.slice(1), 16);
++  return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
++}
++
++function fieldText(id: string, runner: BuildInput["runner"]): string {
++  switch (id) {
++    case "nom_complet":
++      return `${runner.prenom} ${runner.nom}`.trim();
++    case "course":
++      return runner.course || "";
++    case "temps":
++      return runner.temps || "";
++    case "classement": {
++      const parts = [
++        runner.classement_scratch ? `Scratch ${runner.classement_scratch}` : "",
++        runner.classement_genre ? `Genre ${runner.classement_genre}` : "",
++        runner.classement_categorie ? `Cat. ${runner.classement_categorie}` : "",
++      ].filter(Boolean);
++      return parts.join(" · ");
++    }
++    case "edition":
++      return runner.edition || "";
++    default:
++      return "";
++  }
++}
++
++/**
++ * Génère un PDF A4 paysage (ou dimensions du JSON) avec fond + textes.
++ * Les polices du paquet sont intégrées ; pas de substitution silencieuse.
++ */
++export async function buildCertificatePdf(input: BuildInput): Promise<{
++  ok: boolean;
++  error?: string;
++  pdf?: Uint8Array;
++  embeddedFonts?: string[];
++}> {
++  const { settings, fonts, background, backgroundMime, runner, offsets } = input;
++  const pageW = settings.page_width_mm * MM_TO_PT;
++  const pageH = settings.page_height_mm * MM_TO_PT;
++
++  const doc = await PDFDocument.create();
++  const page = doc.addPage([pageW, pageH]);
++
++  try {
++    const img =
++      backgroundMime === "image/png"
++        ? await doc.embedPng(background)
++        : await doc.embedJpg(background);
++    page.drawImage(img, { x: 0, y: 0, width: pageW, height: pageH });
++  } catch {
++    return { ok: false, error: "Impossible d'intégrer l'image de fond." };
++  }
++
++  const fontMap = new Map<string, Awaited<ReturnType<typeof doc.embedFont>>>();
++  const embedded: string[] = [];
++  for (const f of fonts) {
++    try {
++      const emb = await doc.embedFont(f.bytes, { subset: true });
++      fontMap.set(f.family, emb);
++      embedded.push(f.family);
++    } catch {
++      return {
++        ok: false,
++        error: `Police illisible ou non intégrable : ${f.family}. Substitution interdite.`,
++      };
++    }
++  }
++
++  for (const field of settings.fields) {
++    const font = fontMap.get(field.fontFamily);
++    if (!font) {
++      return {
++        ok: false,
++        error: `Police manquante pour le champ ${field.id} (${field.fontFamily}).`,
++      };
++    }
++    let text = fieldText(field.id, runner);
++    if (!text) continue;
++
++    let size = field.fontSize_pt;
++    const maxW = (field.maxWidth_mm || settings.page_width_mm * 0.8) * MM_TO_PT;
++    if (field.autoShrink) {
++      while (size > 8 && font.widthOfTextAtSize(text, size) > maxW) {
++        size -= 0.5;
++      }
++    }
++
++    const dx = (offsets?.[field.id]?.dx_mm || 0) * MM_TO_PT;
++    const dy = (offsets?.[field.id]?.dy_mm || 0) * MM_TO_PT;
++    // JSON y_mm from top of page (TMH style) → pdf-lib from bottom
++    const xCenter = field.x_mm * MM_TO_PT + dx;
++    const y = pageH - field.y_mm * MM_TO_PT - dy;
++
++    const textW = font.widthOfTextAtSize(text, size);
++    let x = xCenter;
++    if (field.align === "center") x = xCenter - textW / 2;
++    else if (field.align === "right") x = xCenter - textW;
++
++    page.drawText(text, {
++      x,
++      y,
++      size,
++      font,
++      color: parseColor(field.color),
++    });
++  }
++
++  const pdf = await doc.save();
++  return { ok: true, pdf, embeddedFonts: embedded };
++}
++
++export const FICTIVE_RUNNER: BuildInput["runner"] = {
++  prenom: "Aina",
++  nom: "RABE",
++  course: "Trail Découverte",
++  temps: "01:42:18",
++  classement_scratch: "12",
++  classement_genre: "3",
++  classement_categorie: "2",
++  edition: "2026",
++};
+diff --git a/src/lib/certificats/tmh-package.ts b/src/lib/certificats/tmh-package.ts
+new file mode 100644
+index 0000000..8eaaf29
+--- /dev/null
++++ b/src/lib/certificats/tmh-package.ts
+@@ -0,0 +1,235 @@
++import JSZip from "jszip";
++
++const MAX_ZIP_BYTES = 25 * 1024 * 1024;
++const MAX_BG_BYTES = 12 * 1024 * 1024;
++const MAX_FONT_BYTES = 5 * 1024 * 1024;
++const MAX_PDF_BYTES = 8 * 1024 * 1024;
++
++const ALLOWED_EXT = new Set([
++  "png",
++  "jpg",
++  "jpeg",
++  "json",
++  "ttf",
++  "otf",
++  "pdf",
++]);
++
++export type FieldSettings = {
++  id: string; // nom_complet | course | temps | classement | edition
++  x_mm: number;
++  y_mm: number;
++  fontSize_pt: number;
++  fontFamily: string;
++  fontWeight?: "normal" | "bold";
++  color?: string; // #RRGGBB
++  align?: "left" | "center" | "right";
++  letterSpacing?: number;
++  maxWidth_mm?: number;
++  autoShrink?: boolean;
++};
++
++export type TemplateSettings = {
++  page_width_mm: number;
++  page_height_mm: number;
++  fields: FieldSettings[];
++  fonts?: { family: string; file: string }[];
++};
++
++export type ParsedTmhPackage = {
++  ok: boolean;
++  errors: string[];
++  background?: { name: string; bytes: Uint8Array; mime: string };
++  settings?: TemplateSettings;
++  fonts: { family: string; file: string; bytes: Uint8Array }[];
++  referencePdf?: { name: string; bytes: Uint8Array };
++};
++
++function ext(name: string): string {
++  const i = name.lastIndexOf(".");
++  return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
++}
++
++function baseName(path: string): string {
++  const parts = path.replace(/\\/g, "/").split("/");
++  return parts[parts.length - 1] || path;
++}
++
++export async function parseTmhPackage(buf: ArrayBuffer): Promise<ParsedTmhPackage> {
++  const errors: string[] = [];
++  if (buf.byteLength > MAX_ZIP_BYTES) {
++    return { ok: false, errors: ["Paquet ZIP trop volumineux (max 25 Mo)."], fonts: [] };
++  }
++
++  let zip: JSZip;
++  try {
++    zip = await JSZip.loadAsync(buf);
++  } catch {
++    return { ok: false, errors: ["ZIP illisible."], fonts: [] };
++  }
++
++  const files: { path: string; data: Uint8Array }[] = [];
++  const names = Object.keys(zip.files);
++  for (const path of names) {
++    const f = zip.files[path];
++    if (f.dir) continue;
++    const e = ext(path);
++    if (!ALLOWED_EXT.has(e)) {
++      errors.push(`Fichier interdit dans le paquet : ${path}`);
++      continue;
++    }
++    // refuse executables disguised
++    if (/\.(exe|sh|bat|js|mjs|cjs|html|htm|svg)$/i.test(path)) {
++      errors.push(`Type interdit : ${path}`);
++      continue;
++    }
++    const data = new Uint8Array(await f.async("arraybuffer"));
++    files.push({ path, data });
++  }
++
++  if (errors.length) return { ok: false, errors, fonts: [] };
++
++  let background: ParsedTmhPackage["background"];
++  let settings: TemplateSettings | undefined;
++  let referencePdf: ParsedTmhPackage["referencePdf"];
++  const fontFiles: { path: string; data: Uint8Array }[] = [];
++
++  for (const f of files) {
++    const e = ext(f.path);
++    const bn = baseName(f.path);
++    if (e === "json") {
++      try {
++        const text = new TextDecoder("utf-8").decode(f.data);
++        settings = JSON.parse(text) as TemplateSettings;
++      } catch {
++        errors.push(`JSON de réglages invalide : ${bn}`);
++      }
++    } else if (e === "png" || e === "jpg" || e === "jpeg") {
++      if (f.data.byteLength > MAX_BG_BYTES) {
++        errors.push(`Image trop grande : ${bn}`);
++      } else if (!background) {
++        background = {
++          name: bn,
++          bytes: f.data,
++          mime: e === "png" ? "image/png" : "image/jpeg",
++        };
++      }
++    } else if (e === "ttf" || e === "otf") {
++      if (f.data.byteLength > MAX_FONT_BYTES) errors.push(`Police trop grande : ${bn}`);
++      else fontFiles.push({ path: bn, data: f.data });
++    } else if (e === "pdf") {
++      if (f.data.byteLength > MAX_PDF_BYTES) errors.push(`PDF trop grand : ${bn}`);
++      else
++        referencePdf = {
++          name: bn,
++          bytes: f.data,
++        };
++    }
++  }
++
++  if (!background) errors.push("Image de fond (PNG/JPG) manquante dans le paquet.");
++  if (!settings) errors.push("Fichier de réglages JSON manquant.");
++  if (!settings?.fields?.length) errors.push("Aucun champ défini dans les réglages.");
++  if (!settings?.page_width_mm || !settings?.page_height_mm) {
++    errors.push("Dimensions de page (mm) manquantes dans les réglages.");
++  }
++
++  // Fonts required by settings must be present — no substitution
++  const fonts: ParsedTmhPackage["fonts"] = [];
++  if (settings) {
++    const needed = new Set<string>();
++    for (const field of settings.fields) {
++      if (field.fontFamily) needed.add(field.fontFamily);
++    }
++    for (const map of settings.fonts || []) {
++      needed.add(map.family);
++    }
++    for (const family of needed) {
++      const mapped = (settings.fonts || []).find((x) => x.family === family);
++      const fileName = mapped?.file;
++      const found = fontFiles.find(
++        (ff) =>
++          (fileName && ff.path.toLowerCase() === fileName.toLowerCase()) ||
++          ff.path.toLowerCase().includes(family.toLowerCase().replace(/\s+/g, ""))
++      );
++      if (!found) {
++        errors.push(
++          `Police manquante ou illisible pour la famille « ${family} ». Substitution interdite.`
++        );
++      } else {
++        fonts.push({ family, file: found.path, bytes: found.data });
++      }
++    }
++    if (needed.size === 0 && fontFiles.length === 0) {
++      errors.push("Aucune police fournie alors que le modèle en nécessite.");
++    }
++  }
++
++  return {
++    ok: errors.length === 0,
++    errors,
++    background,
++    settings,
++    fonts,
++    referencePdf,
++  };
++}
++
++/** Réglages d'exemple pour V1 (à ajuster avec le fond réel). */
++export const EXAMPLE_SETTINGS_V1: TemplateSettings = {
++  page_width_mm: 297,
++  page_height_mm: 210,
++  fonts: [
++    { family: "CertificateSans", file: "CertificateSans-Regular.ttf" },
++  ],
++  fields: [
++    {
++      id: "nom_complet",
++      x_mm: 148.5,
++      y_mm: 95,
++      fontSize_pt: 28,
++      fontFamily: "CertificateSans",
++      fontWeight: "bold",
++      color: "#1F2C3F",
++      align: "center",
++      maxWidth_mm: 220,
++      autoShrink: true,
++    },
++    {
++      id: "course",
++      x_mm: 148.5,
++      y_mm: 115,
++      fontSize_pt: 16,
++      fontFamily: "CertificateSans",
++      color: "#A1532D",
++      align: "center",
++    },
++    {
++      id: "temps",
++      x_mm: 148.5,
++      y_mm: 130,
++      fontSize_pt: 18,
++      fontFamily: "CertificateSans",
++      color: "#1F2C3F",
++      align: "center",
++    },
++    {
++      id: "classement",
++      x_mm: 148.5,
++      y_mm: 145,
++      fontSize_pt: 14,
++      fontFamily: "CertificateSans",
++      color: "#444444",
++      align: "center",
++    },
++    {
++      id: "edition",
++      x_mm: 148.5,
++      y_mm: 175,
++      fontSize_pt: 12,
++      fontFamily: "CertificateSans",
++      color: "#666666",
++      align: "center",
++    },
++  ],
++};
+diff --git a/supabase/migrate_certificats.sql b/supabase/migrate_certificats.sql
+new file mode 100644
+index 0000000..a744390
+--- /dev/null
++++ b/supabase/migrate_certificats.sql
+@@ -0,0 +1,55 @@
++-- Certificats finisher / résultats officiels TMH-GmCAP
++-- À exécuter manuellement dans Supabase SQL Editor (non exécuté par cette PR).
++
++create table if not exists certificate_editions (
++  id uuid primary key default gen_random_uuid(),
++  code text not null unique, -- ex. 2026
++  label text not null,
++  published boolean not null default false,
++  results_version integer not null default 0,
++  previous_snapshot jsonb,
++  template_bg_path text,
++  template_settings jsonb,
++  template_fonts jsonb, -- [{name, path, family}]
++  template_reference_pdf_path text,
++  template_confirmed boolean not null default false,
++  results_public boolean not null default false,
++  created_at timestamptz not null default now(),
++  updated_at timestamptz not null default now()
++);
++
++create table if not exists certificate_results (
++  id uuid primary key default gen_random_uuid(),
++  edition_id uuid not null references certificate_editions(id) on delete cascade,
++  edition_code text not null,
++  course text not null,
++  dossard text not null,
++  prenom text not null,
++  nom text not null,
++  nom_norm text not null, -- sans accents, minuscules
++  genre text,
++  categorie text,
++  nationalite text,
++  statut text not null check (statut in ('FINISHER','DNF','DNS','DSQ','HORS_DELAI')),
++  temps text, -- hh:mm:ss
++  classement_scratch text,
++  classement_genre text,
++  classement_categorie text,
++  import_version integer not null default 1,
++  created_at timestamptz not null default now(),
++  unique (edition_id, course, dossard)
++);
++
++create index if not exists idx_cert_results_lookup
++  on certificate_results (edition_id, dossard, nom_norm);
++
++create index if not exists idx_cert_results_edition on certificate_results (edition_id);
++
++alter table certificate_editions enable row level security;
++alter table certificate_results enable row level security;
++
++-- Pas de policy publique : accès uniquement via service_role (API serveur / admin).
++-- Les politiques SELECT pour authenticated peuvent être ajoutées si besoin admin client ;
++-- le site public n'interroge jamais ces tables depuis le navigateur.
++
++comment on table certificate_results is 'Résultats officiels importés depuis TMH/GmCAP — pas de calcul de temps sur le site';
+diff --git a/vitest.config.ts b/vitest.config.ts
+new file mode 100644
+index 0000000..473639c
+--- /dev/null
++++ b/vitest.config.ts
+@@ -0,0 +1,9 @@
++import { defineConfig } from "vitest/config";
++import path from "path";
++
++export default defineConfig({
++  test: { environment: "node" },
++  resolve: {
++    alias: { "@": path.resolve(__dirname, "./src") },
++  },
++});
+-- 
+2.43.0
+

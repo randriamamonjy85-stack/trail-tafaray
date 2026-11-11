@@ -67,7 +67,7 @@ const defaultSettings: Settings = {
 };
 
 const inputCls =
-  "w-full border border-stone-300 rounded-lg px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F2C3F]/30 focus:border-[#1F2C3F]";
+  "w-full rounded-xl border border-stone-300 bg-white px-4 py-3.5 text-base text-stone-900 shadow-sm transition-colors placeholder:text-stone-400 hover:border-stone-400 focus:border-[#1F2C3F] focus:outline-none focus:ring-4 focus:ring-[#1F2C3F]/10";
 
 function pricesFrom(s: Settings): Record<string, number> {
   return {
@@ -90,14 +90,16 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
-      <h2 className="text-lg font-semibold text-[#1F2C3F] border-b border-stone-100 pb-2">
-        {title}
-        {titleMg && (
-          <span className="block text-sm font-normal text-stone-500 mt-0.5">{titleMg}</span>
-        )}
-      </h2>
-      {children}
+    <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition-shadow hover:shadow-md sm:rounded-3xl">
+      <div className="space-y-5 p-5 sm:p-7">
+        <div className="border-b border-stone-100 pb-3">
+          <h2 className="text-lg font-bold tracking-tight text-[#1F2C3F] sm:text-xl">{title}</h2>
+          {titleMg && (
+            <p className="mt-1 text-sm font-normal text-stone-500">{titleMg}</p>
+          )}
+        </div>
+        {children}
+      </div>
     </section>
   );
 }
@@ -114,11 +116,11 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-stone-700 mb-1">
+    <div className="min-w-0">
+      <label className="mb-2 block text-sm font-semibold text-stone-700">
         <span>{label}</span>
-        {labelMg && <span className="text-stone-500 font-normal"> / {labelMg}</span>}
-        {required ? " *" : ""}
+        {labelMg && <span className="font-normal text-stone-500"> / {labelMg}</span>}
+        {required ? <span className="ml-1 text-blue-700">*</span> : ""}
       </label>
       {children}
     </div>
@@ -302,14 +304,26 @@ function InscriptionForm() {
   };
 
   if (!loaded) {
-    return <div className="p-20 text-center text-stone-500">Chargement...</div>;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-24 text-center text-stone-500">
+        <div
+          className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-stone-200 border-t-blue-600"
+          role="status"
+          aria-label="Chargement"
+        />
+        Chargement...
+      </div>
+    );
   }
 
   if (!settings.inscriptions_ouvertes) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <div className="bg-white rounded-2xl border border-stone-200 p-12">
-          <h1 className="text-3xl font-bold text-[#1F2C3F] mb-4">Inscriptions fermées</h1>
+      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <div className="rounded-3xl border border-stone-200 bg-white p-8 shadow-sm sm:p-12">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-2xl text-blue-700">
+            !
+          </div>
+          <h1 className="mb-3 text-3xl font-bold text-[#1F2C3F]">Inscriptions fermées</h1>
           <p className="text-stone-600">Les inscriptions ne sont pas ouvertes pour le moment.</p>
         </div>
       </div>
@@ -323,12 +337,15 @@ function InscriptionForm() {
       "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + qrPayload;
 
     return (
-      <div className="max-w-lg mx-auto px-4 py-12">
-        <div className="bg-white rounded-2xl border border-stone-200 p-8 sm:p-10 text-center shadow-sm">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#1F2C3F] mb-6">
+      <div className="mx-auto max-w-lg px-4 py-12">
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-lg shadow-stone-900/5 sm:p-10">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-700">
+            ✓
+          </div>
+          <h1 className="mb-6 text-2xl font-bold text-[#1F2C3F] sm:text-3xl">
             Inscription enregistrée
           </h1>
-          <div className="text-left space-y-2 text-stone-700 bg-stone-50 rounded-xl p-4 mb-6 text-sm sm:text-base">
+          <div className="mb-6 space-y-2 rounded-2xl border border-blue-100 bg-white p-4 text-left text-sm text-stone-700 sm:text-base">
             <p>
               <span className="text-stone-500">Nom :</span> <strong>{summaryNom}</strong>
             </p>
@@ -343,11 +360,11 @@ function InscriptionForm() {
             </p>
             <p>
               <span className="text-stone-500">Référence :</span>{" "}
-              <strong className="font-mono text-[#A1532D]">{reference}</strong>
+              <strong className="font-mono text-blue-700">{reference}</strong>
             </p>
             <p>
               <span className="text-stone-500">Statut :</span>{" "}
-              <strong className="text-amber-700">En attente</strong>
+              <strong className="text-blue-700">En attente</strong>
             </p>
           </div>
           <p className="text-sm text-stone-600 mb-3">QR code unique de votre inscription</p>
@@ -355,7 +372,7 @@ function InscriptionForm() {
           <img
             src={qrUrl}
             alt={"QR " + reference}
-            className="mx-auto w-48 h-48 border border-stone-200 rounded-xl bg-white p-2"
+            className="mx-auto h-48 w-48 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm"
           />
           <p className="text-sm text-stone-500 mt-4">
             L&apos;administrateur vérifiera votre paiement Mobile Money et validera manuellement
@@ -370,14 +387,37 @@ function InscriptionForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
-      <h1 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">Inscription</h1>
-      <p className="text-stone-600 mb-8">
-        Remplissez le formulaire en une seule étape / Fenoy ity taratasy ity. Les champs * sont
-        obligatoires / Tsy maintsy fenoina ny misy *.
-      </p>
+    <div className="relative isolate overflow-hidden bg-white pb-12">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border-[40px] border-blue-600/[0.04]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-40 top-72 h-96 w-96 rounded-full border-[48px] border-blue-600/[0.03]"
+      />
+      <div className="relative mx-auto max-w-4xl px-4 pb-8 pt-10 sm:pb-10 sm:pt-14">
+        <header className="mb-7 rounded-3xl border border-blue-100 bg-white p-6 text-[#1F2C3F] shadow-sm sm:mb-9 sm:p-9">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-blue-800">
+              <span className="h-2 w-2 rounded-full bg-blue-600" />
+              Trail Tafaray
+            </span>
+            <span className="rounded-full border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-800">
+              Une seule étape
+            </span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Inscription</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600 sm:text-base">
+            Remplissez le formulaire en une seule étape / Fenoy ity taratasy ity. Les champs * sont
+            obligatoires / Tsy maintsy fenoina ny misy *.
+          </p>
+          <p className="mt-4 text-xs font-semibold text-blue-700">
+            FORMULAIRE D&apos;INSCRIPTION <span className="mx-1.5 text-blue-500">•</span> TRAIL &amp; VTT
+          </p>
+        </header>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
         <Section title="1. Informations personnelles" titleMg="1. Mombamombanao">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nom" labelMg="Anarana" required>
@@ -399,7 +439,7 @@ function InscriptionForm() {
           </div>
 
           <Field label="Date de naissance" labelMg="Daty nahaterahana" required>
-            <div className="flex gap-2 items-center">
+            <div className="flex items-center gap-2">
               <input
                 className={inputCls}
                 inputMode="numeric"
@@ -410,7 +450,7 @@ function InscriptionForm() {
                 required
               />
               <label
-                className="relative shrink-0 cursor-pointer border border-stone-300 rounded-lg p-3 hover:bg-stone-50"
+                className="relative shrink-0 cursor-pointer rounded-xl border border-stone-300 bg-white p-3.5 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50"
                 title="Calendrier"
               >
                 <span className="sr-only">Calendrier</span>
@@ -424,8 +464,8 @@ function InscriptionForm() {
                 📅
               </label>
             </div>
-            {dateError && <p className="text-sm text-red-600 mt-1">{dateError}</p>}
-            <p className="text-xs text-stone-500 mt-1">
+            {dateError && <p className="mt-2 text-sm font-medium text-blue-700">{dateError}</p>}
+            <p className="mt-2 text-xs text-stone-500">
               Tapez votre date de naissance ou utilisez le calendrier.
             </p>
           </Field>
@@ -496,14 +536,14 @@ function InscriptionForm() {
         <Section title="2. Informations sportives" titleMg="2. Mombamomba ara-panatanjahan-tena">
           <Field label="Course" labelMg="Lalao / hazakazaka" required>
             {courseParam && form.course === courseParam ? (
-              <div className="space-y-2">
-                <p className="font-semibold text-[#1F2C3F] text-lg">{form.course}</p>
-                <p className="text-sm text-[#A1532D]">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                <p className="text-lg font-bold text-[#1F2C3F]">{form.course}</p>
+                <p className="mt-1 text-sm font-semibold text-blue-700">
                   {(prices[form.course] || 0).toLocaleString("fr-MG")} Ar
                 </p>
                 <button
                   type="button"
-                  className="text-sm text-stone-500 underline"
+                  className="mt-3 inline-flex rounded-full border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-600 underline-offset-2 transition-colors hover:border-stone-400 hover:text-[#1F2C3F] hover:underline"
                   onClick={() => set("course", "")}
                 >
                   Changer de course
@@ -527,16 +567,22 @@ function InscriptionForm() {
           </Field>
 
           {categorieResult ? (
-            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm">
-              Catégorie calculée automatiquement :{" "}
-              <strong className="text-green-900">{categorieResult}</strong>
+            <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-sm text-[#1F2C3F]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+                ✓
+              </span>
+              <span>
+                Catégorie calculée automatiquement :{" "}
+                <strong className="text-blue-800">{categorieResult}</strong>
+              </span>
             </div>
           ) : form.dateNaissance && form.genre && form.course ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
+            <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-sm text-blue-900">
+              <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
               Catégorie en cours de calcul…
             </div>
           ) : (
-            <p className="text-sm text-stone-500">
+            <p className="rounded-xl border border-dashed border-blue-200 bg-white px-4 py-3 text-sm leading-6 text-stone-500">
               La catégorie sera calculée automatiquement selon votre date de naissance, votre genre
               et la course.
             </p>
@@ -565,7 +611,9 @@ function InscriptionForm() {
             </Field>
           )}
           {form.course === "Zaza Tafaray" && (
-            <p className="text-sm text-stone-500">Zaza Tafaray : pas de t-shirt fourni.</p>
+            <p className="rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-stone-500">
+              Zaza Tafaray : pas de t-shirt fourni.
+            </p>
           )}
         </Section>
 
@@ -611,13 +659,13 @@ function InscriptionForm() {
               />
             </Field>
           )}
-          <p className="text-sm text-stone-500">
+          <p className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-3 text-sm text-stone-600">
             Tarif navette : {(settings.tarif_navette || 20000).toLocaleString("fr-MG")} Ar / personne.
           </p>
         </Section>
 
         <Section title="5. Paiement Mobile Money" titleMg="5. Fandoavam-bola Mobile Money">
-          <div className="bg-stone-50 rounded-xl p-4 text-sm space-y-1 mb-2">
+          <div className="mb-2 space-y-2 rounded-2xl border border-blue-100 bg-blue-50/40 p-4 text-sm sm:p-5">
             <div className="flex justify-between">
               <span>Inscription {form.course || "—"}</span>
               <span>{totals.prixCourse.toLocaleString("fr-MG")} Ar</span>
@@ -634,9 +682,11 @@ function InscriptionForm() {
                 <span>{totals.frais.toLocaleString("fr-MG")} Ar</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-[#1F2C3F] border-t border-stone-200 pt-2 mt-2">
-              <span>TOTAL À PAYER</span>
-              <span>{totals.total.toLocaleString("fr-MG")} Ar</span>
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border-t border-blue-100 bg-white px-3 py-3 font-bold text-[#1F2C3F] sm:px-4">
+              <span className="text-xs tracking-wide sm:text-sm">TOTAL À PAYER</span>
+              <span className="text-lg text-blue-700 sm:text-xl">
+                {totals.total.toLocaleString("fr-MG")} Ar
+              </span>
             </div>
           </div>
 
@@ -654,7 +704,7 @@ function InscriptionForm() {
           </Field>
 
           {form.operateur && (
-            <div className="bg-[#1F2C3F]/5 border border-stone-200 rounded-xl p-4 text-sm space-y-1">
+            <div className="space-y-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-sm sm:p-5">
               <p>
                 <strong>Bénéficiaire :</strong>{" "}
                 {settings.mm_beneficiaire || "Association Trail Tafaray"}
@@ -676,7 +726,9 @@ function InscriptionForm() {
                 <strong>Montant à transférer :</strong> {totals.total.toLocaleString("fr-MG")} Ar
               </p>
               {settings.mm_instructions && (
-                <p className="text-stone-600 mt-2">{settings.mm_instructions}</p>
+                <p className="mt-3 border-t border-blue-100 pt-3 leading-6 text-stone-600">
+                  {settings.mm_instructions}
+                </p>
               )}
             </div>
           )}
@@ -692,21 +744,21 @@ function InscriptionForm() {
         </Section>
 
         <Section title="6. Acceptation du règlement" titleMg="6. Fanekena ny fitsipika">
-          <label className="flex items-start gap-3 text-sm">
+          <label className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-sm leading-6 text-stone-700">
             <input
               type="checkbox"
-              className="mt-1"
+              className="mt-1 h-4 w-4 shrink-0 accent-blue-700 focus:ring-2 focus:ring-blue-500/20"
               checked={form.acceptReglement}
               onChange={(e) => set("acceptReglement", e.target.checked)}
               required
             />
             <span>
               J&apos;accepte le{" "}
-              <a href="/reglement" className="underline text-[#A1532D]" target="_blank">
+              <a href="/reglement" className="font-semibold text-blue-700 underline underline-offset-2" target="_blank">
                 règlement de participation
               </a>{" "}
               et la{" "}
-              <a href="/confidentialite" className="underline text-[#A1532D]" target="_blank">
+              <a href="/confidentialite" className="font-semibold text-blue-700 underline underline-offset-2" target="_blank">
                 politique de confidentialité
               </a>
               .
@@ -714,13 +766,13 @@ function InscriptionForm() {
           </label>
         </Section>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-950">
-          <p className="font-semibold mb-1">IMPORTANT</p>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 text-sm leading-6 text-[#1F2C3F] sm:p-5">
+          <p className="mb-1 font-bold tracking-wide text-blue-800">IMPORTANT</p>
           <p>
             CIN ou PASSEPORT / FICHE MÉDICALE et AUTORISATION PARENTALE doivent être présentés lors du retrait
             des dossards.
           </p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-stone-600">
             CIN na PASSEPORT / taratasy ara-pahasalamana ary ny fanomezan-dàlana avy amin&apos;ny ray aman-dreny dia tsy maintsy
             aseho rehefa maka ny dossard.
           </p>
@@ -729,13 +781,14 @@ function InscriptionForm() {
         <button
           type="submit"
           disabled={loading || !form.dateNaissance || !form.genre || !form.course}
-          className="w-full bg-[#1F2C3F] text-white py-4 rounded-full font-semibold text-lg hover:bg-[#2a3d55] disabled:opacity-50"
+          className="w-full rounded-2xl bg-[#1F2C3F] px-6 py-4 text-base font-bold text-white shadow-lg shadow-[#1F2C3F]/15 transition-all hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:text-lg"
         >
           {loading
             ? "Enregistrement..."
             : "Valider mon inscription / Hametraka ny fisoratana anarana"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

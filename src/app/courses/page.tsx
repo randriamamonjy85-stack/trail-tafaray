@@ -25,41 +25,44 @@ export default async function CoursesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <h1 className="text-4xl font-bold text-[#1F2C3F] mb-4">Les courses</h1>
-      <p className="text-stone-600 mb-12 max-w-2xl">
-        {settings.texte_courses ||
-          "Choisissez votre format. Chaque course a ses catégories, distances et conditions spécifiques."}
-      </p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+      <div className="mb-12 sm:mb-14">
+        <p className="section-kicker mb-3">Épreuves</p>
+        <h1 className="text-4xl sm:text-5xl font-semibold text-[#0f1b2d] mb-4 tracking-tight">Les courses</h1>
+        <p className="text-stone-600 max-w-2xl leading-relaxed">
+          {settings.texte_courses ||
+            "Choisissez votre format. Chaque course a ses catégories, distances et conditions spécifiques."}
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.map((course) => (
           <div
             key={course.nom}
-            className="bg-white rounded-2xl p-6 border border-stone-200 hover:shadow-md transition"
+            className="premium-card rounded-3xl p-7 hover:-translate-y-1 transition-all duration-300 flex flex-col"
           >
-            <div className="text-sm font-medium text-[#A1532D] mb-2">
+            <div className="inline-flex self-start text-xs font-semibold text-[#b7793d] tracking-[0.16em] uppercase mb-3">
               {course.type_epreuve || "RUN"}
             </div>
-            <h2 className="text-xl font-bold text-[#1F2C3F] mb-2">{course.nom}</h2>
-            <p className="text-3xl font-bold text-stone-800 mb-3">{course.distance}</p>
+            <h2 className="text-2xl font-semibold text-[#0f1b2d] mb-2 tracking-tight">{course.nom}</h2>
+            <p className="text-3xl font-bold text-[#0f1b2d] mb-2">{course.distance}</p>
             {course.denivele && (
-              <p className="text-sm text-stone-600 mb-1">D+ {course.denivele}</p>
+              <p className="text-sm text-stone-500 mb-1">D+ {course.denivele}</p>
             )}
-            <p className="text-sm font-medium text-[#A1532D] mb-4">
+            <p className="text-base font-semibold text-[#b7793d] mb-6">
               {Number(course.tarif || 0).toLocaleString("fr-MG")} Ar
             </p>
-            <div className="flex flex-wrap gap-3">
+            <div className="mt-auto flex flex-wrap gap-3">
               <Link
                 href={`/courses/${course.slug || "detail"}`}
-                className="inline-block border border-stone-300 px-4 py-2 rounded-full text-sm font-medium hover:bg-stone-50"
+                className="inline-flex border border-stone-300/80 px-4 py-2.5 rounded-full text-sm font-medium text-stone-700 hover:bg-stone-50 transition"
               >
-                En savoir plus
+                Détails
               </Link>
               {settings.inscriptions_ouvertes && (
                 <Link
                   href={`/inscription?course=${encodeURIComponent(course.nom)}`}
-                  className="inline-block bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#8a4526]"
+                  className="inline-flex bg-[#0f1b2d] text-white px-4 py-2.5 rounded-full text-sm font-medium hover:bg-[#18263b] transition"
                 >
                   S&apos;inscrire
                 </Link>

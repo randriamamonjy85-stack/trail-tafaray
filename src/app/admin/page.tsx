@@ -70,6 +70,9 @@ type Settings = {
   mobile_money_mvola: string;
   mobile_money_orange: string;
   mobile_money_airtel: string;
+  hero_image_url?: string;
+  evenement_image_url?: string;
+  countdown_bg_url?: string;
 };
 
 const emptySettings: Settings = {
@@ -94,6 +97,9 @@ const emptySettings: Settings = {
   mobile_money_mvola: "",
   mobile_money_orange: "",
   mobile_money_airtel: "",
+  hero_image_url: "",
+  evenement_image_url: "",
+  countdown_bg_url: "",
 };
 
 export default function AdminPage() {
@@ -841,6 +847,52 @@ export default function AdminPage() {
               value={settings.texte_evenements || ""}
               onChange={(e) => setSettings({ ...settings, texte_evenements: e.target.value })}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Image page Événements (affichée à côté du texte, URL)</label>
+            <input
+              className="w-full border border-stone-300 rounded-lg px-4 py-2 mb-2"
+              placeholder="https://... ou uploadez ci-dessous"
+              value={(settings as any).evenement_image_url || ""}
+              onChange={(e) => setSettings({ ...settings, evenement_image_url: e.target.value } as any)}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const url = await uploadImage(f, "evenements");
+                if (url) setSettings({ ...settings, evenement_image_url: url } as any);
+              }}
+            />
+            {(settings as any).evenement_image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(settings as any).evenement_image_url} alt="Événement" className="mt-2 h-32 object-cover rounded-lg" />
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Image de fond sous le compte à rebours (accueil)</label>
+            <input
+              className="w-full border border-stone-300 rounded-lg px-4 py-2 mb-2"
+              placeholder="https://... ou uploadez ci-dessous"
+              value={(settings as any).countdown_bg_url || ""}
+              onChange={(e) => setSettings({ ...settings, countdown_bg_url: e.target.value } as any)}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const url = await uploadImage(f, "countdown");
+                if (url) setSettings({ ...settings, countdown_bg_url: url } as any);
+              }}
+            />
+            {(settings as any).countdown_bg_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={(settings as any).countdown_bg_url} alt="Fond compte à rebours" className="mt-2 h-32 object-cover rounded-lg" />
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Texte page Courses</label>

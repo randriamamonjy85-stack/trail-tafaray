@@ -23,7 +23,11 @@ export default function SiteHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-[72px]">
           <a href="/" className="flex items-center gap-3 min-w-0 group">
+<<<<<<< HEAD
             <div className="rounded-xl bg-white/10 p-1.5 ring-1 ring-white/15 group-hover:bg-white/15 transition">
+=======
+            <div className="rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-black/5">
+>>>>>>> caef917 (Ajout images evenement, fond compte a rebours et fonds courses)
               <Image
                 src="/logo-tafaray.png"
                 alt="Logo Trail Tafaray"

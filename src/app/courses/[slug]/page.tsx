@@ -28,9 +28,9 @@ export default async function CourseDetailPage({
 
   if (!c) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold text-[#1F2C3F] mb-4">Course introuvable</h1>
-        <Link href="/courses" className="text-[#A1532D] underline">
+      <div className="max-w-3xl mx-auto px-4 py-24 text-center">
+        <h1 className="text-3xl font-semibold text-[#0f1b2d] mb-4 tracking-tight">Course introuvable</h1>
+        <Link href="/courses" className="text-[#b7793d] hover:underline font-medium">
           Retour aux courses
         </Link>
       </div>
@@ -38,93 +38,97 @@ export default async function CourseDetailPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-16">
-      <Link href="/courses" className="text-sm text-stone-500 hover:underline">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <Link href="/courses" className="inline-flex text-sm text-stone-500 hover:text-[#0f1b2d] transition">
         ← Toutes les courses
       </Link>
-      <h1 className="text-4xl font-bold text-[#1F2C3F] mt-4 mb-2">{c.nom}</h1>
-      <p className="text-[#A1532D] font-medium mb-6">
-        {c.distance}
-        {c.denivele ? ` · D+ ${c.denivele}` : ""}
-        {c.type_epreuve ? ` · ${c.type_epreuve}` : ""}
-      </p>
+      <div className="mt-6 mb-8">
+        <p className="section-kicker mb-3">{c.type_epreuve || "Course"}</p>
+        <h1 className="text-4xl sm:text-5xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">{c.nom}</h1>
+        <p className="text-[#b7793d] font-medium text-lg">
+          {c.distance}
+          {c.denivele ? ` · D+ ${c.denivele}` : ""}
+        </p>
+      </div>
 
       {c.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.image_url} alt={c.nom} className="w-full max-h-80 object-cover rounded-2xl mb-8" />
+        <img src={c.image_url} alt={c.nom} className="w-full max-h-[420px] object-cover rounded-3xl mb-10 shadow-lg shadow-black/5" />
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <div className="text-xs text-stone-500">Tarif</div>
-          <div className="font-bold">{Number(c.tarif || 0).toLocaleString("fr-MG")} Ar</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+        <div className="premium-card rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.14em] text-stone-500 mb-1">Tarif</div>
+          <div className="font-semibold text-[#0f1b2d] text-lg">{Number(c.tarif || 0).toLocaleString("fr-MG")} Ar</div>
         </div>
-        <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <div className="text-xs text-stone-500">Départ</div>
-          <div className="font-bold">{c.heure_depart || "—"}</div>
+        <div className="premium-card rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.14em] text-stone-500 mb-1">Départ</div>
+          <div className="font-semibold text-[#0f1b2d] text-lg">{c.heure_depart || "—"}</div>
         </div>
-        <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <div className="text-xs text-stone-500">Niveau</div>
-          <div className="font-bold">{c.niveau || "—"}</div>
+        <div className="premium-card rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.14em] text-stone-500 mb-1">Niveau</div>
+          <div className="font-semibold text-[#0f1b2d] text-lg">{c.niveau || "—"}</div>
         </div>
-        <div className="bg-white border border-stone-200 rounded-xl p-4">
-          <div className="text-xs text-stone-500">T-shirt</div>
-          <div className="font-bold">{c.tee_shirt ? "Oui" : "Non"}</div>
+        <div className="premium-card rounded-2xl p-5">
+          <div className="text-xs uppercase tracking-[0.14em] text-stone-500 mb-1">T-shirt</div>
+          <div className="font-semibold text-[#0f1b2d] text-lg">{c.tee_shirt ? "Oui" : "Non"}</div>
         </div>
       </div>
 
-      {c.description && (
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-[#1F2C3F] mb-2">Description</h2>
-          <p className="text-stone-700 whitespace-pre-line">{c.description}</p>
-        </section>
-      )}
-      {c.historique && (
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-[#1F2C3F] mb-2">Historique</h2>
-          <p className="text-stone-700 whitespace-pre-line">{c.historique}</p>
-        </section>
-      )}
-      {c.particularites && (
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-[#1F2C3F] mb-2">Particularités</h2>
-          <p className="text-stone-700 whitespace-pre-line">{c.particularites}</p>
-        </section>
-      )}
-      {c.conditions && (
-        <section className="mb-8">
-          <h2 className="text-xl font-semibold text-[#1F2C3F] mb-2">Conditions</h2>
-          <p className="text-stone-700 whitespace-pre-line">{c.conditions}</p>
-        </section>
-      )}
+      <div className="grid gap-8">
+        {c.description && (
+          <section className="premium-card rounded-3xl p-7 sm:p-8">
+            <h2 className="text-xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">Description</h2>
+            <p className="text-stone-700 leading-relaxed whitespace-pre-line">{c.description}</p>
+          </section>
+        )}
+        {c.historique && (
+          <section className="premium-card rounded-3xl p-7 sm:p-8">
+            <h2 className="text-xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">Historique</h2>
+            <p className="text-stone-700 leading-relaxed whitespace-pre-line">{c.historique}</p>
+          </section>
+        )}
+        {c.particularites && (
+          <section className="premium-card rounded-3xl p-7 sm:p-8">
+            <h2 className="text-xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">Particularités</h2>
+            <p className="text-stone-700 leading-relaxed whitespace-pre-line">{c.particularites}</p>
+          </section>
+        )}
+        {c.conditions && (
+          <section className="premium-card rounded-3xl p-7 sm:p-8">
+            <h2 className="text-xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">Conditions</h2>
+            <p className="text-stone-700 leading-relaxed whitespace-pre-line">{c.conditions}</p>
+          </section>
+        )}
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-8 mb-10">
         {c.carte_url && (
-          <div>
-            <h3 className="font-medium mb-2">Carte</h3>
+          <div className="premium-card rounded-3xl p-5">
+            <h3 className="font-medium text-[#0f1b2d] mb-3">Carte</h3>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.carte_url} alt="Carte" className="rounded-xl border" />
+            <img src={c.carte_url} alt="Carte" className="rounded-xl w-full" />
           </div>
         )}
         {c.profil_url && (
-          <div>
-            <h3 className="font-medium mb-2">Profil altimétrique</h3>
+          <div className="premium-card rounded-3xl p-5">
+            <h3 className="font-medium text-[#0f1b2d] mb-3">Profil altimétrique</h3>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.profil_url} alt="Profil" className="rounded-xl border" />
+            <img src={c.profil_url} alt="Profil" className="rounded-xl w-full" />
           </div>
         )}
       </div>
 
       <div className="flex flex-wrap gap-3">
         {c.gpx_url && (
-          <a href={c.gpx_url} className="border border-stone-300 px-5 py-2 rounded-full text-sm font-medium" download>
+          <a href={c.gpx_url} className="border border-stone-300/80 px-6 py-3 rounded-full text-sm font-medium text-stone-700 hover:bg-stone-50 transition" download>
             Télécharger le GPX
           </a>
         )}
         {settings.inscriptions_ouvertes && (
           <Link
             href={`/inscription?course=${encodeURIComponent(c.nom)}`}
-            className="bg-[#A1532D] text-white px-5 py-2 rounded-full text-sm font-medium"
+            className="bg-gradient-to-r from-[#b7793d] to-[#d9a441] text-[#0f1b2d] px-7 py-3 rounded-full text-sm font-semibold hover:brightness-110 transition shadow-lg shadow-black/10"
           >
             S&apos;inscrire
           </Link>

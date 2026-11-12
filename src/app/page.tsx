@@ -74,45 +74,47 @@ export default async function Home() {
     return (
     <div className="overflow-x-hidden">
       {/* HERO */}
-      <section className="relative min-h-[85vh] flex items-center justify-center bg-[#1F2C3F] text-white overflow-hidden">
+      <section className="relative min-h-[92vh] flex items-center justify-center bg-[#0f1b2d] text-white overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[8s] hover:scale-110"
+          className="absolute inset-0 bg-cover bg-center scale-105"
           style={{ backgroundImage: `url('${heroBg}')` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1F2C3F]/80 via-[#1F2C3F]/55 to-[#1F2C3F]/90" />
-        <div className="relative z-10 text-center px-4 max-w-4xl py-20 animate-[fadeUp_0.8s_ease-out]">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f1b2d]/85 via-[#0f1b2d]/60 to-[#0f1b2d]/95" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_400px_at_70%_10%,rgba(217,164,65,0.18),transparent_60%)]" />
+        <div className="relative z-10 text-center px-4 max-w-5xl py-24 animate-[fadeUp_0.8s_ease-out]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 mb-8 backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d9a441]" />
+            <span className="text-xs sm:text-sm tracking-[0.18em] uppercase text-stone-200">Run · Bike · Anjeva</span>
+          </div>
           <Image
             src="/logo-tafaray.png"
             alt="Trail Tafaray"
-            width={120}
-            height={120}
-            className="mx-auto mb-6 h-24 w-auto drop-shadow-lg"
+            width={140}
+            height={140}
+            className="mx-auto mb-8 h-24 sm:h-28 w-auto drop-shadow-2xl"
           />
-          <p className="text-[#A1532D] text-xs sm:text-sm tracking-[0.25em] uppercase mb-4 font-semibold">
-            RUN · BIKE · ANJEVA
-          </p>
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-semibold tracking-tight mb-6 leading-[1.05]">
             {settings.hero_titre || "Trail Tafaray"}
           </h1>
-          <p className="text-base sm:text-xl text-stone-200 mb-10 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-xl text-stone-300 mb-12 max-w-2xl mx-auto leading-relaxed">
             {settings.hero_sous_titre}
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {settings.inscriptions_ouvertes ? (
               <Link
                 href="/inscription"
-                className="bg-[#A1532D] text-white px-8 py-3.5 rounded-full font-semibold text-base sm:text-lg hover:bg-[#8a4526] hover:scale-[1.03] active:scale-[0.98] transition-all shadow-lg shadow-[#A1532D]/25"
+                className="bg-gradient-to-r from-[#b7793d] to-[#d9a441] text-[#0f1b2d] px-9 py-3.5 rounded-full font-semibold text-base sm:text-lg hover:brightness-110 hover:-translate-y-0.5 transition-all shadow-xl shadow-black/25"
               >
                 S&apos;inscrire maintenant
               </Link>
             ) : (
-              <span className="bg-stone-500 text-white px-8 py-3.5 rounded-full font-semibold">
+              <span className="bg-white/10 border border-white/15 text-white px-9 py-3.5 rounded-full font-semibold backdrop-blur">
                 Inscriptions fermées
               </span>
             )}
             <Link
               href="/courses"
-              className="border border-white/40 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-white/10 hover:border-white/70 transition-all"
+              className="border border-white/25 text-white px-9 py-3.5 rounded-full font-semibold hover:bg-white/10 hover:border-white/40 transition-all backdrop-blur"
             >
               Découvrir les courses
             </Link>
@@ -121,16 +123,14 @@ export default async function Home() {
       </section>
 
       {/* COUNTDOWN */}
-      <section className="py-16 sm:py-20 bg-white">
+      <section className="py-20 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-[#A1532D] text-xs tracking-widest uppercase font-semibold mb-2">
-            Prochain rendez-vous
-          </p>
-          <h2 className="text-2xl sm:text-4xl font-bold text-[#1F2C3F] mb-2">
+          <p className="section-kicker mb-3">Prochain rendez-vous</p>
+          <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">
             Compte à rebours
           </h2>
-          <p className="text-stone-600 mb-1 capitalize">{dateAffichee}</p>
-          <p className="text-stone-500 mb-10">{settings.lieu_evenement}</p>
+          <p className="text-stone-700 mb-1 capitalize">{dateAffichee}</p>
+          <p className="text-stone-500 mb-12">{settings.lieu_evenement}</p>
           <Countdown
             targetDate={settings.date_evenement || "2027-10-24T06:00:00+03:00"}
           />
@@ -138,70 +138,75 @@ export default async function Home() {
       </section>
 
       {/* COURSES */}
-      <section className="py-16 sm:py-20 bg-stone-50">
+      <section className="py-20 sm:py-24 relative">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-stone-200 to-transparent" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-[#A1532D] text-xs tracking-widest uppercase font-semibold mb-2">
-              Formats
-            </p>
-            <h2 className="text-2xl sm:text-4xl font-bold text-[#1F2C3F] mb-3">
-              Les courses
-            </h2>
-            <p className="text-stone-600 max-w-2xl mx-auto text-sm sm:text-base">
-              {settings.texte_courses ||
-                "Six formats pour tous les niveaux, du trail découverte au duathlon nature."}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12">
+            <div>
+              <p className="section-kicker mb-3">Formats</p>
+              <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">
+                Les courses
+              </h2>
+              <p className="text-stone-600 max-w-2xl text-sm sm:text-base leading-relaxed">
+                {settings.texte_courses ||
+                  "Six formats pour tous les niveaux, du trail découverte au duathlon nature."}
+              </p>
+            </div>
+            <Link href="/courses" className="text-sm font-medium text-[#b7793d] hover:text-[#0f1b2d] transition shrink-0">
+              Voir toutes les courses →
+            </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((c) => {
               const prix = Number(c.tarif) || tarifs[c.nom] || 0;
               const slug = c.slug || "detail";
               return (
                 <article
                   key={c.id || c.nom}
-                  className="group bg-white rounded-2xl border border-stone-200/80 overflow-hidden flex flex-col shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                  className="group premium-card rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1.5"
                 >
-                  <div className="relative h-44 overflow-hidden bg-[#1F2C3F]">
+                  <div className="relative h-52 overflow-hidden bg-[#0f1b2d]">
                     {c.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={c.image_url}
                         alt={c.nom}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#1F2C3F] to-[#3d4f66] flex items-center justify-center">
-                        <span className="text-white/70 text-sm tracking-wide">
+                      <div className="w-full h-full bg-gradient-to-br from-[#0f1b2d] via-[#18263b] to-[#243955] flex items-center justify-center">
+                        <span className="text-white/70 text-sm tracking-[0.18em] uppercase">
                           {c.type_epreuve || "TRAIL"}
                         </span>
                       </div>
                     )}
-                  </div>
-                  <div className="p-5 sm:p-6 flex flex-col flex-1">
-                    <div className="text-xs font-semibold text-[#A1532D] mb-1 tracking-wide">
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f1b2d]/50 to-transparent" />
+                    <div className="absolute top-4 left-4 rounded-full bg-white/10 backdrop-blur border border-white/20 px-3 py-1 text-xs font-medium text-white tracking-wide">
                       {c.type_epreuve || "RUN"}
                     </div>
-                    <h3 className="text-lg sm:text-xl font-bold text-[#1F2C3F] mb-1">
+                  </div>
+                  <div className="p-6 sm:p-7 flex flex-col flex-1">
+                    <h3 className="text-xl sm:text-2xl font-semibold text-[#0f1b2d] mb-2 tracking-tight">
                       {c.nom}
                     </h3>
-                    <p className="text-2xl font-bold text-stone-800 mb-1">{c.distance}</p>
-                    {c.denivele && (
-                      <p className="text-sm text-stone-500 mb-1">D+ {c.denivele}</p>
-                    )}
-                    <p className="text-sm font-medium text-[#A1532D] mb-4">
+                    <div className="flex items-baseline gap-3 mb-2">
+                      <p className="text-2xl font-bold text-[#0f1b2d]">{c.distance}</p>
+                      {c.denivele && <p className="text-sm text-stone-500">D+ {c.denivele}</p>}
+                    </div>
+                    <p className="text-sm font-semibold text-[#b7793d] mb-6">
                       {prix.toLocaleString("fr-MG")} Ar
                     </p>
-                    <div className="mt-auto flex flex-wrap gap-2">
+                    <div className="mt-auto flex flex-wrap gap-3">
                       <Link
                         href={`/courses/${slug}`}
-                        className="inline-block border border-stone-300 px-4 py-2 rounded-full text-sm font-medium hover:bg-stone-50 transition"
+                        className="inline-flex items-center border border-stone-300/80 px-4 py-2.5 rounded-full text-sm font-medium text-stone-700 hover:bg-stone-50 hover:border-stone-400 transition"
                       >
-                        En savoir plus
+                        Détails
                       </Link>
                       {settings.inscriptions_ouvertes && (
                         <Link
                           href={`/inscription?course=${encodeURIComponent(c.nom)}`}
-                          className="inline-block bg-[#A1532D] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#8a4526] transition"
+                          className="inline-flex items-center bg-[#0f1b2d] text-white px-4 py-2.5 rounded-full text-sm font-medium hover:bg-[#18263b] transition"
                         >
                           S&apos;inscrire
                         </Link>
@@ -217,27 +222,25 @@ export default async function Home() {
 
       {/* GALERIE */}
       {photos.length > 0 && (
-        <section className="py-16 bg-white">
+        <section className="py-20 sm:py-24">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-end mb-8 gap-4">
+            <div className="flex justify-between items-end mb-10 gap-4">
               <div>
-                <p className="text-[#A1532D] text-xs tracking-widest uppercase font-semibold mb-1">
-                  Moments
-                </p>
-                <h2 className="text-2xl sm:text-3xl font-bold text-[#1F2C3F]">Galerie</h2>
+                <p className="section-kicker mb-2">Moments</p>
+                <h2 className="text-3xl sm:text-4xl font-semibold text-[#0f1b2d] tracking-tight">Galerie</h2>
               </div>
-              <Link href="/galerie" className="text-sm text-[#A1532D] hover:underline shrink-0">
+              <Link href="/galerie" className="text-sm font-medium text-[#b7793d] hover:text-[#0f1b2d] transition shrink-0">
                 Voir tout →
               </Link>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {photos.map((p) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={p.id}
                   src={p.url}
                   alt={p.titre || ""}
-                  className="w-full h-36 sm:h-44 object-cover rounded-xl hover:opacity-90 hover:scale-[1.02] transition duration-300"
+                  className="w-full h-40 sm:h-52 object-cover rounded-2xl hover:opacity-95 hover:scale-[1.02] transition duration-500 shadow-sm"
                 />
               ))}
             </div>
@@ -246,19 +249,17 @@ export default async function Home() {
       )}
 
       {settings.partenaires_visibles && partenaires.length > 0 && (
-        <section className="py-16 sm:py-20 bg-[#F7F4EF]">
+        <section className="py-20 sm:py-24 bg-gradient-to-b from-white to-[#f3efe8]">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-14">
-              <p className="text-[#A1532D] text-xs tracking-[0.2em] uppercase font-semibold mb-3">
-                Ils nous soutiennent
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2C3F] mb-3">
+              <p className="section-kicker mb-3">Ils nous soutiennent</p>
+              <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-4 tracking-tight">
                 Nos partenaires
               </h2>
-              <p className="text-stone-600 text-sm sm:text-base max-w-xl mx-auto">
+              <p className="text-stone-600 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
                 Merci aux organisations qui rendent le Trail Tafaray possible, du départ jusqu&apos;à la ligne d&apos;arrivée.
               </p>
-              <Link href="/partenaires" className="inline-block mt-4 text-sm text-[#A1532D] hover:underline">
+              <Link href="/partenaires" className="inline-block mt-5 text-sm font-medium text-[#b7793d] hover:text-[#0f1b2d] transition">
                 Voir tous les partenaires →
               </Link>
             </div>
@@ -266,7 +267,7 @@ export default async function Home() {
             <div className="mt-16 text-center">
               <a
                 href={mailto}
-                className="inline-block bg-[#1F2C3F] text-white px-8 py-3 rounded-full font-semibold text-sm hover:bg-[#2a3d55] transition"
+                className="inline-flex bg-[#0f1b2d] text-white px-8 py-3.5 rounded-full font-semibold text-sm hover:bg-[#18263b] transition shadow-lg shadow-black/10"
               >
                 Devenir partenaire
               </a>
@@ -276,21 +277,23 @@ export default async function Home() {
       )}
 
       {/* CTA final */}
-      <section className="py-16 sm:py-20 bg-[#1F2C3F] text-white text-center">
-        <div className="max-w-3xl mx-auto px-4">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-4">Prêt pour l&apos;aventure ?</h2>
-          <p className="text-stone-300 mb-8">
+      <section className="relative py-20 sm:py-24 bg-[#0f1b2d] text-white text-center overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(700px_300px_at_50%_0%,rgba(217,164,65,0.2),transparent_60%)]" />
+        <div className="relative max-w-3xl mx-auto px-4">
+          <p className="text-[#d9a441] text-xs tracking-[0.22em] uppercase font-semibold mb-4">Rejoignez-nous</p>
+          <h2 className="text-3xl sm:text-5xl font-semibold mb-5 tracking-tight">Prêt pour l&apos;aventure ?</h2>
+          <p className="text-stone-300 mb-10 text-base sm:text-lg">
             Rejoignez-nous sur les sentiers d&apos;Anjeva.
           </p>
           {settings.inscriptions_ouvertes ? (
             <Link
               href="/inscription"
-              className="inline-block bg-[#A1532D] text-white px-8 py-3.5 rounded-full font-semibold hover:bg-[#8a4526] hover:scale-[1.03] transition-all"
+              className="inline-block bg-gradient-to-r from-[#b7793d] to-[#d9a441] text-[#0f1b2d] px-10 py-4 rounded-full font-semibold hover:brightness-110 transition-all shadow-xl shadow-black/25"
             >
               S&apos;inscrire
             </Link>
           ) : (
-            <span className="inline-block bg-stone-600 text-white px-8 py-3.5 rounded-full font-semibold">
+            <span className="inline-block bg-white/10 border border-white/15 text-white px-10 py-4 rounded-full font-semibold backdrop-blur">
               Inscriptions fermées
             </span>
           )}

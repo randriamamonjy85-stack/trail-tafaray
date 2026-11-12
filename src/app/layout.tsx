@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import Image from "next/image";
 import SiteFooter from "@/components/SiteFooter";
 import SiteHeader from "@/components/SiteHeader";
 import SponsorsPublic from "@/components/sponsors/SponsorsPublic";
@@ -9,6 +8,11 @@ import SponsorsPublic from "@/components/sponsors/SponsorsPublic";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-display",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${inter.variable} h-full`}>
+    <html lang="fr" className={`${inter.variable} ${playfair.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-transparent text-stone-900 antialiased">
         <SiteHeader />
         <main className="flex-1">{children}</main>

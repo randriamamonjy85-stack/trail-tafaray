@@ -78,38 +78,36 @@ export default function SponsorPopup({ sponsors }: { sponsors: SponsorRecord[] }
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-[#0f1b2d]/70 backdrop-blur-sm"
         aria-label="Fermer la publicité"
         onClick={close}
       />
-      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
-        <div className="flex justify-between items-center px-4 py-2 border-b border-stone-100">
-          <span className="text-xs text-stone-500">Sponsor</span>
+      <div className="relative z-10 w-full max-w-sm bg-gradient-to-b from-white to-[#fffaf3] rounded-3xl shadow-2xl border border-[#d9a441]/25 overflow-hidden">
+        <div className="flex justify-between items-center px-5 py-3 border-b border-[#b7793d]/10">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-[#b7793d] font-semibold font-[family-name:var(--font-display)]">Sponsor</span>
           <button
             ref={closeBtnRef}
             type="button"
             onClick={close}
-            className="text-sm font-medium text-stone-700 hover:text-[#1F2C3F] px-2 py-1 rounded-lg"
+            className="text-sm font-medium text-stone-600 hover:text-[#0f1b2d] px-2 py-1 rounded-lg"
           >
             Fermer ✕
           </button>
         </div>
-        <div className="p-4 flex flex-col items-center gap-3">
+        <div className="p-6 flex flex-col items-center gap-4">
           {current.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={current.image_url}
-              alt={current.nom}
-              className="max-h-28 object-contain"
-            />
+            <img src={current.image_url} alt={current.nom} className="max-h-28 object-contain" />
           )}
-          <p className="font-semibold text-[#1F2C3F] text-center">{current.nom}</p>
+          <p className="font-semibold text-[#0f1b2d] text-center text-xl font-[family-name:var(--font-display)] tracking-tight">
+            {current.nom}
+          </p>
           {current.site_url && (
             <a
               href={current.site_url}
               target="_blank"
               rel="noopener sponsored"
-              className="inline-block bg-[#A1532D] text-white text-sm font-medium px-5 py-2 rounded-full hover:bg-[#8a4526]"
+              className="inline-block bg-gradient-to-r from-[#b7793d] to-[#d9a441] text-[#0f1b2d] text-sm font-semibold px-6 py-2.5 rounded-full hover:brightness-110 shadow-lg shadow-black/10"
               onClick={() => {
                 fetch("/api/sponsors/track", {
                   method: "POST",

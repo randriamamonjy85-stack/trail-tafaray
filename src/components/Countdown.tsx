@@ -30,17 +30,17 @@ export default function Countdown({ targetDate }: { targetDate: string }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 max-w-3xl mx-auto">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-3xl mx-auto">
       {items.map((item) => (
         <div
           key={item.label}
-          className="premium-card rounded-2xl p-5 sm:p-6 text-center relative overflow-hidden"
+          className="rounded-2xl p-5 sm:p-6 text-center relative overflow-hidden bg-white/95 backdrop-blur border border-white/60 shadow-xl shadow-black/10"
         >
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#b7793d] via-[#d9a441] to-[#b7793d] opacity-70" />
-          <div className="text-3xl sm:text-4xl font-bold text-[#0f1b2d] tracking-tight">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#b7793d] via-[#d9a441] to-[#b7793d]" />
+          <div className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] tracking-tight font-[family-name:var(--font-display)]">
             {String(item.value).padStart(2, "0")}
           </div>
-          <div className="text-xs sm:text-sm text-stone-500 mt-2 uppercase tracking-[0.12em]">
+          <div className="text-[11px] sm:text-xs text-[#b7793d] mt-2 uppercase tracking-[0.18em] font-semibold">
             {item.label}
           </div>
         </div>

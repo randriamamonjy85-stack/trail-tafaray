@@ -123,27 +123,31 @@ export default async function Home() {
       </section>
 
       {/* COUNTDOWN */}
-      <section className="relative py-20 sm:py-24 overflow-hidden">
+      <section className="relative py-24 sm:py-32 overflow-hidden">
         {(settings as any).countdown_bg_url ? (
           <>
             <div
-              className="absolute inset-0 bg-cover bg-center"
+              className="absolute inset-0 bg-cover bg-center scale-105"
               style={{ backgroundImage: `url('${(settings as any).countdown_bg_url}')` }}
             />
-            <div className="absolute inset-0 bg-[#f8f7f4]/80 backdrop-blur-[1px]" />
-            <div className="absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-[#f8f7f4]/90" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f1b2d]/55 via-[#0f1b2d]/35 to-[#0f1b2d]/60" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(217,164,65,0.12),transparent_70%)]" />
           </>
-        ) : null}
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-[#f8f7f4] to-[#efe9df]" />
+        )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="section-kicker mb-3">Prochain rendez-vous</p>
-          <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">
+          <p className={`section-kicker mb-3 ${(settings as any).countdown_bg_url ? "text-[#f0c96b]" : ""}`}>Prochain rendez-vous</p>
+          <h2 className={`text-3xl sm:text-5xl font-semibold mb-3 tracking-tight ${(settings as any).countdown_bg_url ? "text-white drop-shadow-sm" : "text-[#0f1b2d]"}`}>
             Compte à rebours
           </h2>
-          <p className="text-stone-700 mb-1 capitalize">{dateAffichee}</p>
-          <p className="text-stone-500 mb-12">{settings.lieu_evenement}</p>
-          <Countdown
-            targetDate={settings.date_evenement || "2027-10-24T06:00:00+03:00"}
-          />
+          <p className={`mb-1 capitalize ${(settings as any).countdown_bg_url ? "text-stone-100" : "text-stone-700"}`}>{dateAffichee}</p>
+          <p className={`mb-12 ${(settings as any).countdown_bg_url ? "text-stone-200/90" : "text-stone-500"}`}>{settings.lieu_evenement}</p>
+          <div className="inline-block rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 p-3 sm:p-4 shadow-2xl shadow-black/20">
+            <Countdown
+              targetDate={settings.date_evenement || "2027-10-24T06:00:00+03:00"}
+            />
+          </div>
         </div>
       </section>
 
@@ -259,17 +263,19 @@ export default async function Home() {
       )}
 
       {settings.partenaires_visibles && partenaires.length > 0 && (
-        <section className="py-20 sm:py-24 bg-gradient-to-b from-white to-[#f3efe8]">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-14">
-              <p className="section-kicker mb-3">Ils nous soutiennent</p>
-              <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-4 tracking-tight">
+        <section className="relative py-20 sm:py-28 overflow-hidden bg-[#0f1b2d]">
+          <div className="absolute inset-0 bg-[radial-gradient(900px_400px_at_15%_10%,rgba(183,121,61,0.22),transparent_60%),radial-gradient(700px_300px_at_85%_90%,rgba(217,164,65,0.18),transparent_55%)]" />
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d9a441]/50 to-transparent" />
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <p className="text-[#f0c96b] text-xs tracking-[0.22em] uppercase font-semibold mb-3">Ils nous soutiennent</p>
+              <h2 className="text-3xl sm:text-5xl font-semibold text-white mb-4 tracking-tight font-[family-name:var(--font-display)]">
                 Nos partenaires
               </h2>
-              <p className="text-stone-600 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
+              <p className="text-stone-300 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
                 Merci aux organisations qui rendent le Trail Tafaray possible, du départ jusqu&apos;à la ligne d&apos;arrivée.
               </p>
-              <Link href="/partenaires" className="inline-block mt-5 text-sm font-medium text-[#b7793d] hover:text-[#0f1b2d] transition">
+              <Link href="/partenaires" className="inline-block mt-5 text-sm font-medium text-[#d9a441] hover:text-white transition">
                 Voir tous les partenaires →
               </Link>
             </div>
@@ -277,7 +283,7 @@ export default async function Home() {
             <div className="mt-16 text-center">
               <a
                 href={mailto}
-                className="inline-flex bg-[#0f1b2d] text-white px-8 py-3.5 rounded-full font-semibold text-sm hover:bg-[#18263b] transition shadow-lg shadow-black/10"
+                className="inline-flex bg-gradient-to-r from-[#b7793d] to-[#d9a441] text-[#0f1b2d] px-8 py-3.5 rounded-full font-semibold text-sm hover:brightness-110 transition shadow-lg shadow-black/20"
               >
                 Devenir partenaire
               </a>

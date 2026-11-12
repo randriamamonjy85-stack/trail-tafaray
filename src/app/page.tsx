@@ -123,10 +123,6 @@ export default async function Home() {
       </section>
 
       {/* COUNTDOWN */}
-<<<<<<< HEAD
-      <section className="py-20 sm:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-=======
       <section className="relative py-20 sm:py-24 overflow-hidden">
         {(settings as any).countdown_bg_url ? (
           <>
@@ -139,7 +135,6 @@ export default async function Home() {
           </>
         ) : null}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
->>>>>>> caef917 (Ajout images evenement, fond compte a rebours et fonds courses)
           <p className="section-kicker mb-3">Prochain rendez-vous</p>
           <h2 className="text-3xl sm:text-5xl font-semibold text-[#0f1b2d] mb-3 tracking-tight">
             Compte à rebours
